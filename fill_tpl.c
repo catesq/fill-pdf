@@ -61,6 +61,34 @@ fill_type fill_tpl_text_data(pdf_env *env, fill_env *fillenv, fill_type success_
         fillenv->text.editable = 0;
     }
 
+    json_t *json_font = json_object_get(fillenv->json_map_item, "font");
+    if(json_is_string(json_font)) {
+        fillenv->text.font = json_string_value(json_font);
+    } else {
+        fillenv->text.font = 0;
+    }
+
+    json_t *json_color= json_object_get(fillenv->json_map_item, "color");
+    if(json_is_array(json_color) && json_array_size(json_color) == 3) {
+        fillenv->text.color[0] = json_number_value(json_array_get(json_color, 0));
+        fillenv->text.color[1] = json_number_value(json_array_get(json_color, 1));
+        fillenv->text.color[2] = json_number_value(json_array_get(json_color, 2));
+    } else {
+        double color = 0;
+
+        if(json_is_number(json_color))
+            color = json_number_value(json_color);
+
+        if(color < 0)
+            color = 0;
+        else if(color > 1)
+            color = 1;
+
+        fillenv->text.color[0] = color;
+        fillenv->text.color[1] = color;
+        fillenv->text.color[2] = color;
+    }
+
     return success_type;
 }
 

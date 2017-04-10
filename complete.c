@@ -3,6 +3,7 @@
 #include <jansson.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "fill.h"
 
 
@@ -15,9 +16,32 @@ void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field
 
 int cmplt_add_signature(pdf_env *env, fill_env *fillenv) {
     pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_SIGNATURE, (char *) fillenv->input_key);
+
+    pdf_annot *annot = (pdf_annot*) widget;
+    fz_rect rect = {0,0,50,50};
+    pdf_set_annot_rect(env->ctx, annot, &rect);
+
+    char *fn_str = "/Helv 9 Tf 0 g";
+    pdf_obj *da_pdf = pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
+    pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
+    pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
+
     pdf_sign_signature(env->ctx, env->doc, widget, fillenv->sig.file, fillenv->sig.password);
 
     return 1;
+}
+
+
+int cmplt_da_str(text_data *data, char *buf) {
+    int size = 0;
+    char fn[30];
+    sscanf(data->font, "%s %d", fn, &size);
+
+    if(size <= 0) {
+        size = DEFAULT_FONT_HEIGHT;
+    }
+
+    return sprintf(buf, "/%s %d Tf %.2f %.2f %.2f gb", fn, size, data->color[0], data->color[1], data->color[2]);
 }
 
 
@@ -42,6 +66,12 @@ int cmplt_add_textfield(pdf_env *env, fill_env *fillenv) {
     pdf_field_set_value(env->ctx, env->doc, annot->obj, fillenv->input_data);
     pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
 
+    char fn_str[50];
+    if(fillenv->text.font && cmplt_da_str(&fillenv->text, fn_str) > 0) {
+        pdf_obj *da_pdf= pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
+        pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
+    }
+
     if(!fillenv->text.editable) {
         cmplt_set_field_readonly(env->ctx, env->doc, annot->obj);
     }
@@ -53,11 +83,11 @@ int cmplt_add_textfield(pdf_env *env, fill_env *fillenv) {
 pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id) {
     pdf_annot *annot = page->annots;
 
-    while (annot) {
-        if (pdf_annot_type(ctx, annot) != PDF_ANNOT_WIDGET)
+    while(annot) {
+        if(pdf_annot_type(ctx, annot) != PDF_ANNOT_WIDGET)
             continue;
 
-        if (pdf_to_num(ctx, annot->obj) == field_id)
+        if(pdf_to_num(ctx, annot->obj) == field_id)
             return (pdf_widget *) annot;
 
         annot = annot->next;
@@ -70,8 +100,8 @@ pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id) 
 pdf_widget *cmplt_find_widget_name(fz_context *ctx, pdf_page *page, const char *field_name) {
     pdf_annot *annot = page->annots;
 
-    while (annot) {
-        if (pdf_annot_type(ctx, annot) != PDF_ANNOT_WIDGET)
+    while(annot) {
+        if(pdf_annot_type(ctx, annot) != PDF_ANNOT_WIDGET)
             continue;
 
         char *utf8_name = UTF8_FIELD_NAME(ctx, annot->obj);
@@ -163,13 +193,20 @@ int cmplt_fcopy(const char *src, const char *dest) {
     char buf[CP_BUFSIZE];
     int numbytes;
 
-    while (0 < (numbytes = fread(buf, 1, CP_BUFSIZE, in)))
+    while(0 < (numbytes = fread(buf, 1, CP_BUFSIZE, in)))
         fwrite(buf, 1, numbytes, out);
 
     fclose(in);
     fclose(out);
 }
 
+int is_only_digits(const char *str) {
+    while(*str)
+        if(!isdigit(*str++))
+            return 0;
+
+    return 1;
+}
 
 void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
     json_error_t json_err;
@@ -181,7 +218,7 @@ void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
         return;
 
     if (!json_is_object(data_json)) {
-        fprintf(stderr, "input data invalid, json root must be an object");
+        fprintf(stderr, "input data invalid. json root must be an object");
         goto data_exit;
     }
 
@@ -190,18 +227,26 @@ void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
     json_t *template = json_load_file(env->optFile, 0, &json_err);
 
     if (template == NULL) {
-        fprintf(stderr, "template invalid, unable to load file '%s'", env->optFile);
+        fprintf(stderr, "Unable to load template file '%s'", env->optFile);
         goto tpl_exit;
     }
 
+    if(!json_is_object(template)) {
+        fprintf(stderr, "Invalid template file '%s'. json root must be an object.", env->optFile);
+        goto tpl_exit;
+    }
+
+    const char* obj_idx;
     int page_idx, item_idx;
     json_t *page_val, *item_val;
 
     int updated_doc = 0;
-    json_array_foreach(template, page_idx, page_val) {
-        if (!json_is_array(page_val))
+    json_object_foreach(template, obj_idx, page_val) {
+        // filter pages in the tpl.json.
+        if(!is_only_digits(obj_idx) || !json_is_array(page_val))
             continue;
 
+        sscanf(obj_idx, "%d", &page_idx);
         env->page_num = page_idx;
 
         fz_try(env->ctx) {
@@ -217,7 +262,7 @@ void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
             updated_pg += cmplt_fill_field(env, &fillenv);
         }
 
-        if (updated_pg)
+        if(updated_pg)
             pdf_update_page(env->ctx, env->page);
 
         updated_doc += updated_pg;

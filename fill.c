@@ -10,11 +10,11 @@ extern fz_document_handler pdf_document_handler;
 
 int parse_args(int argc, char **argv, pdf_env *env) {
     int arg;
-    while((arg = getopt(argc, argv, "f:d:m:s:p:j:til")) != -1) {
+    while((arg = getopt(argc, argv, "a:d:m:s:p:j:tfil")) != -1) {
         switch(arg) {
-        case 'f':
+        case 'a':
             if(env->cmd == NO_CMD) {
-                env->cmd = FIELD_OVERLAY;
+                env->cmd = ANNOTATE_FIELDS;
                 env->optFile = optarg;
             }
             break;
@@ -25,6 +25,10 @@ int parse_args(int argc, char **argv, pdf_env *env) {
 
         case 'p':
             env->sigPwd = optarg;
+            break;
+
+        case 'f':
+            env->cmd = FONT_LIST;
             break;
 
         case 'j':
@@ -58,7 +62,6 @@ int parse_args(int argc, char **argv, pdf_env *env) {
             }
             break;
         }
-
     }
 
     if(optind < argc) {
@@ -88,18 +91,18 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Usage message, either: fillpdf [-f out.pdf|-j|-t|-l] input.pdf\n");
         fprintf(stderr, "                   or: fillpdf [-d data.json|-m tpl.json|-i|-s sigfile.pfx|-p pfx_pwd] input.pdf formfilled.pdf\n");
         fprintf(stderr, "Options:\n");
-        fprintf(stderr, " -f output.pdf  Field name annotations. Save a pdf with each input fields object id\n");
-        fprintf(stderr, "                displayed next to input field. Useful for filling in the template.\n");
-        fprintf(stderr, " -j tpl.json    Write the part-completed json template to a file.\n");
-        fprintf(stderr, " -t             Write the part-completed json template to stdout.\n");
-        fprintf(stderr, " -l             List input fields and some info about them.\n");
+        fprintf(stderr, " -j tpl.json   Write the part-completed json template to a file.\n");
+        fprintf(stderr, " -t            Write the part-completed json template to stdout.\n");
+        fprintf(stderr, " -l            List input fields and some info about them.\n");
+        fprintf(stderr, " -a output.pdf Annotate fields with their object num. Useful for filling in the template.\n");
+        fprintf(stderr, " -f            List fonts in page resources.\n");
 
         fprintf(stderr, "\n");
-        fprintf(stderr, " -m tpl.json    The template maps input data to pdf fields.\n");
-        fprintf(stderr, " -d data.json   Input data in json file.\n");
-        fprintf(stderr, " -i             Input data read from stdin.\n");
-        fprintf(stderr, " -s sigfile.pfx To sign pdf.\n");
-        fprintf(stderr, " -p             Password for sigfile.pfx.\n");
+        fprintf(stderr, " -m tpl.json   The template maps input data to pdf fields.\n");
+        fprintf(stderr, " -d data.json  Input data in json file.\n");
+        fprintf(stderr, " -i            Input data read from stdin.\n");
+        fprintf(stderr, " -s sig.pfx    To sign pdf.\n");
+        fprintf(stderr, " -p            Password for sigfile.pfx.\n");
 
         goto main_exit;
     }
