@@ -1,0 +1,5 @@
+The openssl commands to create a self-signed certificate.
+
+openssl genrsa -des3 -out test.key 1024
+openssl req -new -x509 -key test.key -out test.crt
+openssl pkcs12 -export -inkey test.key -in test.crt -out test.pfx

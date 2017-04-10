@@ -1,0 +1,14 @@
+{
+	"personal_name": "A. Smith",
+	"business_name": "SmithCo",
+	"cb_individual": "1",
+	"signed": "A Smith",
+	"date": "Apr 2017",
+	"address_1": "Their address",
+	"address_2": "Is here",
+	"requester": "Employer Ltd\nOffice address",
+	"ssn_1" : "123",
+	"ssn_2" : "12",
+	"ssn_3" : "1234",
+	"addsig": true
+}

@@ -1,0 +1,134 @@
+[
+  [
+    {
+      "id": 741,
+      "name": "f1_1[0]",
+      "key": "personal_name"
+    },
+    {
+      "id": 742,
+      "name": "f1_2[0]",
+      "key": "business_name"
+    },
+    {
+      "id": 743,
+      "name": "c1_1[0]",
+      "key": "cb_individual"
+    },
+    {
+      "id": 745,
+      "name": "c1_1[1]",
+      "key": "cb_corp_c"
+    },
+    {
+      "id": 746,
+      "name": "c1_1[2]",
+      "key": "cb_corp_s"
+    },
+    {
+      "id": 747,
+      "name": "c1_1[3]",
+      "key": "cb_partnership"
+    },
+    {
+      "id": 748,
+      "name": "c1_1[4]",
+      "key": "cb_trust"
+    },
+    {
+      "id": 749,
+      "name": "c1_1[5]",
+      "key": "cb_llc"
+    },
+    {
+      "id": 750,
+      "name": "f1_3[0]",
+      "key": "tax_class"
+    },
+    {
+      "id": 751,
+      "name": "c1_7[0]",
+      "key": "cb_other"
+    },
+    {
+      "id": 752,
+      "name": "f1_4[0]",
+      "key": "other_text"
+    },
+    {
+      "id": 753,
+      "name": "f1_5[0]",
+      "key": "payee_exemption"
+    },
+    {
+      "id": 754,
+      "name": "f1_6[0]",
+      "key": "fatca_exemption"
+    },
+    {
+      "id": 755,
+      "name": "f1_7[0]",
+      "key": "address_1"
+    },
+    {
+      "id": 756,
+      "name": "f1_8[0]",
+      "key": "address_2"
+    },
+    {
+      "id": 757,
+      "name": "f1_9[0]",
+      "key": "requester"
+    },
+    {
+      "id": 758,
+      "name": "f1_10[0]",
+      "key": "list_ac_numbers"
+    },
+    {
+      "id": 759,
+      "name": "f1_11[0]",
+      "key": "ssn_1"
+    },
+    {
+      "id": 760,
+      "name": "f1_12[0]",
+      "key": "ssn_2"
+    },
+    {
+      "id": 761,
+      "name": "f1_13[0]",
+      "key": "ssn_3"
+    },
+    {
+      "id": 762,
+      "name": "f1_14[0]",
+      "key": "employee_id_1"
+    },
+    {
+      "id": 763,
+      "name": "f1_15[0]",
+      "key": "employee_id_2"
+    },
+	{
+      "add": "textfield",
+      "position": [130, 525],
+      "width": 245,
+      "color": [0.0, 0.0, 0.0],
+      "key": "signed"
+	},
+	{
+      "add": "textfield",
+      "position": [408, 525],
+      "color": [0.0, 0.0, 0.0],
+      "key": "date"
+	},
+    {
+      "add": "signature",
+      "key": "addsig"
+    }
+  ],
+  [],
+  [],
+  []
+]
