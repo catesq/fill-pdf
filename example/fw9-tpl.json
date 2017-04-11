@@ -1,4 +1,4 @@
-[
+{
   "0": [
     {
       "id": 741,
@@ -112,20 +112,22 @@
     },
 	{
       "add": "textfield",
-      "position": [130, 525],
-      "width": 245,
-      "color": [0.0, 0.0, 0.0],
+      "rect": {"left": 130, "top":525, "width": 245},
+      "font": "Helv",
+      "color": [1.0, 0.0, 0.0],
       "key": "signed"
 	},
 	{
       "add": "textfield",
-      "position": [408, 525],
+      "rect": {"left": 408, "top":525},
       "color": [0.0, 0.0, 0.0],
       "key": "date"
 	},
     {
       "add": "signature",
+      "font": "Helv",
+      "rect": {"left": 490, "top":510, "width": 40, "height": 40},
       "key": "addsig"
     }
   ]
-]
+}

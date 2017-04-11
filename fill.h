@@ -9,9 +9,13 @@ typedef enum {FILL_DATA_INVALID, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_SIGNAT
 
 typedef enum {NO_CMD, ANNOTATE_FIELDS, FONT_LIST, JSON_MAP, JSON_LIST, COMPLETE_PDF, COMPLETE_PDF_STDIN} command;
 
-#define DEFAULT_WIDTH 140
-#define DEFAULT_HEIGHT 14
+#define DEFAULT_SIG_WIDTH 100
+#define DEFAULT_SIG_HEIGHT 100
+
+#define DEFAULT_TEXT_WIDTH 140
+#define DEFAULT_TEXT_HEIGHT 14
 #define DEFAULT_FONT_HEIGHT 9
+
 #define CP_BUFSIZE 32768
 #define DEFAULT_SIG_VISIBLITY 1
 
@@ -19,12 +23,16 @@ typedef enum {NO_CMD, ANNOTATE_FIELDS, FONT_LIST, JSON_MAP, JSON_LIST, COMPLETE_
 
 #define RETURN_FILL_ERROR(fillenv, err) { fillenv->err_msg = err; return FILL_DATA_INVALID; }
 
+typedef struct {
+    float left;
+    float top;
+    float right;
+    float bottom;
+} pos_data;
 
 typedef struct {
-    float x;
-    float y;
-    float w;
-    float h;
+    pos_data pos;
+    const char *font;
     const char *file;
     const char *password;
     int visible;
@@ -32,10 +40,7 @@ typedef struct {
 
 
 typedef struct {
-    float x;
-    float y;
-    float w;
-    float h;
+    pos_data pos;
     int editable;
     const char *font;
     float color[3];
@@ -101,7 +106,7 @@ typedef struct {
     pre_visit_doc_func post_visit_doc;
 } visit_funcs;
 
-int cmplt_da_str(text_data *data, char *buf);
+int cmplt_da_str(const char *font, float *color, char *buf);
 void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field);
 int cmplt_fcopy(const char *src, const char *dest);
 int cmplt_add_textfield(pdf_env *env, fill_env *fillenv);
@@ -114,6 +119,8 @@ void cmplt_fill_all(pdf_env *env, FILE *data_input);
 pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id);
 
 
+double fill_tpl_get_number(json_t *jsn_obj, const char *property, float default_val, float min_val);
+void fill_tpl_get_position_data(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height);
 fill_type fill_tpl_signature_data(pdf_env *env, fill_env *fillenv);
 fill_type fill_tpl_text_data(pdf_env *env, fill_env *fillenv, fill_type success_type);
 fill_type fill_tpl_data(pdf_env *env, fill_env *fillenv);

@@ -1,6 +1,35 @@
 #include "fill.h"
 
+double fill_tpl_get_number(json_t *jsn_obj, const char *property, float default_val, float min_val) {
+    json_t *jsn_val = json_object_get(jsn_obj, property);
+
+    if(json_is_number(jsn_val) && json_number_value(jsn_val) >= min_val) {
+        return json_number_value(jsn_val);
+    } else {
+       return default_val;
+    }
+}
+
+void fill_tpl_get_position_data(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height) {
+    pos->left = fill_tpl_get_number(jsn_obj, "left", default_xy, 0);
+    pos->top = fill_tpl_get_number(jsn_obj, "top", default_xy, 0);
+    pos->right = pos->left + fill_tpl_get_number(jsn_obj, "width", default_width, 1);
+    pos->bottom = pos->top + fill_tpl_get_number(jsn_obj, "height", default_height, 1);
+}
+
+
 fill_type fill_tpl_signature_data(pdf_env *env, fill_env *fillenv) {
+    fill_tpl_get_position_data(json_object_get(fillenv->json_map_item, "rect"), &fillenv->sig.pos, 0, DEFAULT_SIG_WIDTH, DEFAULT_SIG_HEIGHT);
+
+    json_t *json_font = json_object_get(fillenv->json_map_item, "font");
+    if(json_is_string(json_font)) {
+        fillenv->sig.font = json_string_value(json_font);
+        fillenv->sig.visible = 1;
+    } else {
+        fillenv->sig.font = 0;
+        fillenv->sig.visible = 0;
+    }
+
     json_t *json_sigfile = json_object_get(fillenv->json_map_item, "sigfile");
 
     if(!json_is_string(json_sigfile) && !env->sigFile) {
@@ -31,27 +60,10 @@ fill_type fill_tpl_signature_data(pdf_env *env, fill_env *fillenv) {
 
 
 fill_type fill_tpl_text_data(pdf_env *env, fill_env *fillenv, fill_type success_type) {
-    json_t *json_pos = json_object_get(fillenv->json_map_item, "position");
+    fill_tpl_get_position_data(json_object_get(fillenv->json_map_item, "rect"), &fillenv->text.pos, -1, DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
 
-    if(!json_is_array(json_pos) || json_array_size(json_pos) != 2) {
+    if(fillenv->text.pos.left < 0 || fillenv->text.pos.top < 0) {
         RETURN_FILL_ERROR(fillenv, "Position invalid");
-    }
-
-    fillenv->text.x = json_number_value(json_array_get(json_pos, 0));
-    fillenv->text.y = json_number_value(json_array_get(json_pos, 1));
-
-    json_t *json_width = json_object_get(fillenv->json_map_item, "width");
-    if(json_is_number(json_width) && json_number_value(json_width) > 1) {
-        fillenv->text.w = json_number_value(json_width);
-    } else {
-        fillenv->text.w = DEFAULT_WIDTH;
-    }
-
-    json_t *json_height = json_object_get(fillenv->json_map_item, "height");
-    if(json_is_number(json_height) && json_number_value(json_height) >= 1) {
-        fillenv->text.h = json_number_value(json_height);
-    } else {
-        fillenv->text.h = DEFAULT_HEIGHT;
     }
 
     json_t *json_edit = json_object_get(fillenv->json_map_item, "editable");
@@ -74,19 +86,9 @@ fill_type fill_tpl_text_data(pdf_env *env, fill_env *fillenv, fill_type success_
         fillenv->text.color[1] = json_number_value(json_array_get(json_color, 1));
         fillenv->text.color[2] = json_number_value(json_array_get(json_color, 2));
     } else {
-        double color = 0;
-
-        if(json_is_number(json_color))
-            color = json_number_value(json_color);
-
-        if(color < 0)
-            color = 0;
-        else if(color > 1)
-            color = 1;
-
-        fillenv->text.color[0] = color;
-        fillenv->text.color[1] = color;
-        fillenv->text.color[2] = color;
+        fillenv->text.color[0] = 0;
+        fillenv->text.color[1] = 0;
+        fillenv->text.color[2] = 0;
     }
 
     return success_type;
@@ -95,7 +97,6 @@ fill_type fill_tpl_text_data(pdf_env *env, fill_env *fillenv, fill_type success_
 
 fill_type fill_tpl_data(pdf_env *env, fill_env *fillenv) {
     json_t *json_id = json_object_get(fillenv->json_map_item, "id");
-
     if(json_id != NULL) {
         if (!json_is_integer(json_id)) {
             RETURN_FILL_ERROR(fillenv, "Invalid field id, must be an integer");
@@ -106,7 +107,6 @@ fill_type fill_tpl_data(pdf_env *env, fill_env *fillenv) {
     }
 
     json_t *json_name = json_object_get(fillenv->json_map_item, "name");
-
     if(json_name != NULL) {
         if (!json_is_string(json_name)) {
             RETURN_FILL_ERROR(fillenv, "Invalid field name, must be a string");

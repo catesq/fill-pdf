@@ -14,17 +14,37 @@ void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field
 }
 
 
+int cmplt_da_str(const char *font, float *color, char *buf) {
+    int size = 0;
+    char tmp_fn[30];
+    sscanf(font, "%s %d", tmp_fn, &size);
+
+    if(size <= 0) {
+        size = DEFAULT_FONT_HEIGHT;
+    }
+
+    if(color == NULL) {
+        return sprintf(buf, "/%s %d Tf 0 g", tmp_fn, size);
+    } else {
+        return sprintf(buf, "/%s %d Tf %.2f %.2f %.2f gb", tmp_fn, size, color[0], color[1], color[2]);
+    }
+}
+
+
 int cmplt_add_signature(pdf_env *env, fill_env *fillenv) {
     pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_SIGNATURE, (char *) fillenv->input_key);
 
     pdf_annot *annot = (pdf_annot*) widget;
-    fz_rect rect = {0,0,50,50};
-    pdf_set_annot_rect(env->ctx, annot, &rect);
 
-    char *fn_str = "/Helv 9 Tf 0 g";
-    pdf_obj *da_pdf = pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
-    pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
-    pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
+    char fn_str[50];
+    if(fillenv->sig.visible != 0 && cmplt_da_str(fillenv->sig.font, NULL, fn_str) > 0) {
+        fz_rect *rect = (fz_rect *) &fillenv->sig.pos;
+
+        pdf_set_annot_rect(env->ctx, annot, rect);
+        pdf_obj *da_pdf = pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
+        pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
+        pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
+    }
 
     pdf_sign_signature(env->ctx, env->doc, widget, fillenv->sig.file, fillenv->sig.password);
 
@@ -32,17 +52,6 @@ int cmplt_add_signature(pdf_env *env, fill_env *fillenv) {
 }
 
 
-int cmplt_da_str(text_data *data, char *buf) {
-    int size = 0;
-    char fn[30];
-    sscanf(data->font, "%s %d", fn, &size);
-
-    if(size <= 0) {
-        size = DEFAULT_FONT_HEIGHT;
-    }
-
-    return sprintf(buf, "/%s %d Tf %.2f %.2f %.2f gb", fn, size, data->color[0], data->color[1], data->color[2]);
-}
 
 
 int cmplt_add_textfield(pdf_env *env, fill_env *fillenv) {
@@ -53,21 +62,16 @@ int cmplt_add_textfield(pdf_env *env, fill_env *fillenv) {
 
     pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_TEXT, buf);
 
-    fz_rect rect = {
-        fillenv->text.x,
-        fillenv->text.y,
-        fillenv->text.x + fillenv->text.w,
-        fillenv->text.y + fillenv->text.h
-    };
+    fz_rect *rect = (fz_rect *) &fillenv->text.pos;
 
     pdf_annot *annot = (pdf_annot*) widget;
 
-    pdf_set_annot_rect(env->ctx, annot, &rect);
+    pdf_set_annot_rect(env->ctx, annot, rect);
     pdf_field_set_value(env->ctx, env->doc, annot->obj, fillenv->input_data);
     pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
 
     char fn_str[50];
-    if(fillenv->text.font && cmplt_da_str(&fillenv->text, fn_str) > 0) {
+    if(fillenv->text.font && cmplt_da_str(fillenv->text.font, fillenv->text.color, fn_str) > 0) {
         pdf_obj *da_pdf= pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
         pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
     }
