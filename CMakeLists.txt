@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required(VERSION 2.6)
 include(ExternalProject)
 
 STRING(TOLOWER "${CMAKE_BUILD_TYPE}" MUPDF_BUILD)
@@ -7,7 +7,7 @@ IF(NOT "${MUPDF_BUILD}" STREQUAL "debug")
 ENDIF()
 
 EXTERNALPROJECT_ADD(mupdf
-    URL "/home/kx/Projects/bountysource/PDF/mupdf-1.10a-source.tar.gz"
+    URL               "http://mupdf.com/downloads/archive/mupdf-1.10a-source.tar.gz"
     PREFIX            "${CMAKE_CURRENT_BINARY_DIR}/mupdf"
     SOURCE_DIR        "${CMAKE_CURRENT_BINARY_DIR}/mupdf"
     STAMP_DIR         "${CMAKE_CURRENT_BINARY_DIR}/mupdf-stamp"
@@ -18,7 +18,7 @@ EXTERNALPROJECT_ADD(mupdf
     BUILD_IN_SOURCE   1
 )
 
-PROJECT (fillpdf)
+PROJECT(fillpdf)
 
 INCLUDE_DIRECTORIES(mupdf/include)
 
