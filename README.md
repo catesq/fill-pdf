@@ -14,10 +14,10 @@ cmake path/to/src
 make
 ```
 
-The fillpdf executable should now ne ready for use in build-dir
+fillpdf should now be ready for use in build-dir
 
 
-Usage
+# Usage
 
 fillpdf needs three input files. 
 
@@ -80,7 +80,7 @@ input_data.json
 }
 ```
 
-# The important part
+# Then
 
 ```
 fillpdf -m new_tpl.json -d input_data.json fill_in.pdf output.pdf
@@ -88,7 +88,7 @@ fillpdf -m new_tpl.json -d input_data.json fill_in.pdf output.pdf
 
 Will fill in all fields listed in input_data (ignoring any data which is not set) and write it to output.pdf.
 
-# Adding more things
+# Add things
 If you want to sign the document add a new signature item to the items of any page in new_tpl.json
 
 
@@ -115,4 +115,4 @@ To make the signature visible it the add: signature item needs to specify the fo
 Textfields can be added in a similar method to signature by changing "add":"signature" to "add":"textfield"
 
 # To do
-Most useful features would be better (proper) support for fonts, being able to add images, being able to add text without needing pretend it's a textfield, annotations. Possibly skipping the clunky template prep and using a more complex input_data json.
+Most useful features would be better (proper) support for fonts, being able to add images, adding text without pretending it's non-editable a textfield, annotations too. Possibly making the clunky template prep optional and adding everything to a more complex input_data json. 
