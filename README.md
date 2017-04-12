@@ -86,7 +86,7 @@ input_data.json
 fillpdf -m new_tpl.json -d input_data.json fill_in.pdf output.pdf
 ``` 
 
-Will fill in all fields listed in input_data (ignoring any data which is not set) and write it to output.pdf.
+Will copy the input data into fill_in.pdf and create output.pdf.
 
 # Add things
 If you want to sign the document add a new signature item to the items of any page in new_tpl.json
