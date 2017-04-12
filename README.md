@@ -112,7 +112,7 @@ To make the signature visible it the add: signature item needs to specify the fo
 }
 ```
 
-Textfields can be added in a similar method to signature by changing "add":"signature" to "add":"textfield"
+Textfields can be added in a similar method to signature by changing "add":"signature" to "add":"textfield" and use the -s & -p options of fillpdf to specify the sigfile and password.
 
 # To do
 Most useful features would be better (proper) support for fonts, being able to add images, adding text without pretending it's non-editable a textfield, annotations too. Possibly making the clunky template prep optional and adding everything to a more complex input_data json. 
