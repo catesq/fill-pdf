@@ -20,7 +20,7 @@ EXTERNALPROJECT_ADD(mupdf
 
 PROJECT(fillpdf)
 
-INCLUDE_DIRECTORIES(mupdf/include)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/mupdf/include)
 
 ADD_EXECUTABLE(fillpdf fill.c fill_tpl.c parse.c complete.c)
 ADD_DEPENDENCIES(fillpdf mupdf)
