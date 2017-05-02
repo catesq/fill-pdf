@@ -1,0 +1,15 @@
+{
+	"personal_name": "A. Smith",
+	"citizen_of": "SmithCo",
+	"residence_address_1": "Their address",
+	"residence_address_2": "Is here",
+	"residence_country": "Hereland",
+	"requester": "Employer Ltd\nOffice address",
+	"ssn_1" : "123",
+	"ssn_2" : "12",
+	"ssn_3" : "1234",
+	"print_signed": "A Smith",
+	"signed": "A Smith",
+	"dated": "Apr 2017",
+	"digsig": true
+}

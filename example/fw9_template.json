@@ -121,7 +121,7 @@
       "add": "textfield",
       "rect": {"left": 408, "top":525},
       "color": [0.0, 0.0, 0.0],
-      "key": "date"
+      "key": "dated"
 	},
     {
       "add": "signature",

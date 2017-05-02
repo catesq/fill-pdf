@@ -1,0 +1,127 @@
+{
+  "0": [
+    {
+      "name": "p1-t1[0]",
+      "id": 231,
+      "key": "personal_name"
+    },
+    {
+      "name": "p1-t2[0]",
+      "id": 232,
+      "key": "citizen_od"
+    },
+    {
+      "name": "p1-t3[0]",
+      "id": 233,
+      "key": "residence_address_1"
+    },
+    {
+      "name": "p1-t4[0]",
+      "id": 234,
+      "key": "residence_address_2"
+    },
+    {
+      "name": "p1-t5[0]",
+      "id": 235,
+      "key": "residence_country"
+    },
+    {
+      "name": "p1-t6[0]",
+      "id": 236,
+      "key": "mail_address_1"
+    },
+    {
+      "name": "p1-t7[0]",
+      "id": 237,
+      "key": "mail_address_2"
+    },
+    {
+      "name": "p1-t8[0]",
+      "id": 238,
+      "key": "mail_country"
+    },
+    {
+      "name": "p1-t9[0]",
+      "id": 239,
+      "key": "us_tax_id"
+    },
+    {
+      "name": "p1-t10[0]",
+      "id": 240,
+      "key": "foreign_tax_id"
+    },
+    {
+      "name": "p1-t11[0]",
+      "id": 241,
+      "key": "ref_num"
+    },
+    {
+      "name": "p1-t12[0]",
+      "id": 242,
+      "key": "date_of_birth"
+    },
+    {
+      "name": "p1-t13[0]",
+      "id": 243,
+      "key": "ptii_country"
+    },
+    {
+      "name": "p1-t16[0]",
+      "id": 244,
+      "key": "ptii_treaty_para"
+    },
+    {
+      "name": "p1-t15[0]",
+      "id": 245,
+      "key": "ptii_withholding"
+    },
+    {
+      "name": "p1-t17[0]",
+      "id": 246,
+      "key": "ptii_income_type"
+    },
+    {
+      "name": "p1-t18[0]",
+      "id": 247,
+      "key": ""
+    },
+    {
+      "name": "p1-t19[0]",
+      "id": 248,
+      "key": "ptii_explain_eligibility_1"
+    },
+    {
+      "name": "p1-t20[0]",
+      "id": 249,
+      "key": "ptii_explain_eligibility_1"
+    },
+    {
+      "name": "p1-t21[0]",
+      "id": 250,
+      "key": "print_signed"
+    },
+    {
+      "name": "p1-t22[0]",
+      "id": 251,
+      "key": "proxy_signers_role"
+    },
+	{
+      "add": "textfield",
+      "rect": {"left": 408, "top":525},
+      "color": [0.0, 0.0, 0.0],
+      "key": "signed"
+	},
+	{
+      "add": "textfield",
+      "rect": {"left": 408, "top":525},
+      "color": [0.0, 0.0, 0.0],
+      "key": "dated"
+	},
+    {
+      "add": "signature",
+      "font": "Helv",
+      "rect": {"left": 490, "top":510, "width": 40, "height": 40},
+      "key": "digsig"
+    }
+  ]
+}
