@@ -31,14 +31,14 @@ int cmplt_da_str(const char *font, float *color, char *buf) {
 }
 
 
-int cmplt_add_signature(pdf_env *env, fill_env *fillenv) {
-    pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_SIGNATURE, (char *) fillenv->input_key);
+int cmplt_add_signature(pdf_env *env) {
+    pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_SIGNATURE, (char *) env->fill.input_key);
 
     pdf_annot *annot = (pdf_annot*) widget;
 
     char fn_str[50];
-    if(fillenv->sig.visible != 0 && cmplt_da_str(fillenv->sig.font, NULL, fn_str) > 0) {
-        fz_rect *rect = (fz_rect *) &fillenv->sig.pos;
+    if(env->fill.sig.visible != 0 && cmplt_da_str(env->fill.sig.font, NULL, fn_str) > 0) {
+        fz_rect *rect = (fz_rect *) &env->fill.sig.pos;
 
         pdf_set_annot_rect(env->ctx, annot, rect);
         pdf_obj *da_pdf = pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
@@ -46,7 +46,7 @@ int cmplt_add_signature(pdf_env *env, fill_env *fillenv) {
         pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
     }
 
-    pdf_sign_signature(env->ctx, env->doc, widget, fillenv->sig.file, fillenv->sig.password);
+    pdf_sign_signature(env->ctx, env->doc, widget, env->fill.sig.file, env->fill.sig.password);
 
     return 1;
 }
@@ -54,29 +54,29 @@ int cmplt_add_signature(pdf_env *env, fill_env *fillenv) {
 
 
 
-int cmplt_add_textfield(pdf_env *env, fill_env *fillenv) {
-    int len = strlen(fillenv->input_key);
+int cmplt_add_textfield(pdf_env *env) {
+    int len = strlen(env->fill.input_key);
     char *buf = malloc(len + 5);
-    memcpy(buf, fillenv->input_key, len);
+    memcpy(buf, env->fill.input_key, len);
     memcpy(buf+len, "[0]\0", 5);
 
     pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_TEXT, buf);
 
-    fz_rect *rect = (fz_rect *) &fillenv->text.pos;
+    fz_rect *rect = (fz_rect *) &env->fill.text.pos;
 
     pdf_annot *annot = (pdf_annot*) widget;
 
     pdf_set_annot_rect(env->ctx, annot, rect);
-    pdf_field_set_value(env->ctx, env->doc, annot->obj, fillenv->input_data);
+    pdf_field_set_value(env->ctx, env->doc, annot->obj, env->fill.input_data);
     pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
 
     char fn_str[50];
-    if(fillenv->text.font && cmplt_da_str(fillenv->text.font, fillenv->text.color, fn_str) > 0) {
+    if(env->fill.text.font && cmplt_da_str(env->fill.text.font, env->fill.text.color, fn_str) > 0) {
         pdf_obj *da_pdf= pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
         pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
     }
 
-    if(!fillenv->text.editable) {
+    if(!env->fill.text.editable) {
         cmplt_set_field_readonly(env->ctx, env->doc, annot->obj);
     }
 
@@ -127,8 +127,8 @@ int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data) {
 }
 
 
-int cmplt_fill_field(pdf_env *env, fill_env *fillenv) {
-    json_t *datakey = json_object_get(fillenv->json_map_item, "key");
+int cmplt_fill_field(pdf_env *env) {
+    json_t *datakey = json_object_get(env->fill.json_map_item, "key");
 
     if(datakey == NULL)
         return 0;
@@ -136,20 +136,20 @@ int cmplt_fill_field(pdf_env *env, fill_env *fillenv) {
     if(!json_is_string(datakey))
         return 0;
 
-    fillenv->input_key = json_string_value(datakey);
-    json_t *dataval = json_object_get(fillenv->json_input_data, fillenv->input_key);
+    env->fill.input_key = json_string_value(datakey);
+    json_t *dataval = json_object_get(env->fill.json_input_data, env->fill.input_key);
 
     if(dataval == NULL)
         return 0;
 
     switch(json_typeof(dataval)) {
         case JSON_STRING:
-            fillenv->input_data = json_string_value(dataval);
+            env->fill.input_data = json_string_value(dataval);
             break;
 
         case JSON_TRUE:
         case JSON_FALSE:
-            fillenv->input_data = json_is_true(dataval) ? "1" : "0";
+            env->fill.input_data = json_is_true(dataval) ? "1" : "0";
             break;
 
         default:
@@ -157,29 +157,29 @@ int cmplt_fill_field(pdf_env *env, fill_env *fillenv) {
 
     }
 
-    if(fillenv->input_data == NULL)
+    if(env->fill.input_data == NULL)
         return 0;
 
     int updated = 0;
     pdf_widget *widget;
 
-    switch(fill_tpl_data(env, fillenv)) {
+    switch(fill_tpl_data(env)) {
         case FIELD_ID:
-            widget = cmplt_find_widget_id(env->ctx, env->page, fillenv->field_id);
-            updated = cmplt_set_widget_value(env, widget, fillenv->input_data);
+            widget = cmplt_find_widget_id(env->ctx, env->page, env->fill.field_id);
+            updated = cmplt_set_widget_value(env, widget, env->fill.input_data);
             break;
 
         case FIELD_NAME:
-            widget = cmplt_find_widget_name(env->ctx, env->page, fillenv->field_name);
-            updated = cmplt_set_widget_value(env, widget, fillenv->input_data);
+            widget = cmplt_find_widget_name(env->ctx, env->page, env->fill.field_name);
+            updated = cmplt_set_widget_value(env, widget, env->fill.input_data);
             break;
 
         case ADD_TEXTFIELD:
-            updated = cmplt_add_textfield(env, fillenv);
+            updated = cmplt_add_textfield(env);
             break;
 
         case ADD_SIGNATURE:
-            updated = cmplt_add_signature(env, fillenv);
+            updated = cmplt_add_signature(env);
             break;
 
         default:
@@ -213,7 +213,6 @@ int is_only_digits(const char *str) {
 
 void cmplt_fill_all(pdf_env *env) {
     json_error_t json_err;
-    fill_env fillenv = {0};
 
     FILE *data_file;
 
@@ -232,7 +231,7 @@ void cmplt_fill_all(pdf_env *env) {
         goto data_exit;
     }
 
-    fillenv.json_input_data = data_json;
+    env->fill.json_input_data = data_json;
 
     json_t *template = json_load_file(env->fill.tplFile, 0, &json_err);
 
@@ -268,8 +267,8 @@ void cmplt_fill_all(pdf_env *env) {
 
         int updated_pg = 0;
 
-        json_array_foreach(page_val, item_idx, fillenv.json_map_item) {
-            updated_pg += cmplt_fill_field(env, &fillenv);
+        json_array_foreach(page_val, item_idx, env->fill.json_map_item) {
+            updated_pg += cmplt_fill_field(env);
         }
 
         if(updated_pg)
