@@ -19,9 +19,13 @@ void fill_tpl_get_position_data(json_t *jsn_obj, pos_data *pos, float default_xy
 
 
 fill_type fill_tpl_signature_data(pdf_env *env, fill_env *fillenv) {
+    const char *sigfile = NULL;
+    json_t *json_sigfile = NULL, *json_font = NULL, *json_pwd;
+    struct stat buffer;
+
     fill_tpl_get_position_data(json_object_get(fillenv->json_map_item, "rect"), &fillenv->sig.pos, 0, DEFAULT_SIG_WIDTH, DEFAULT_SIG_HEIGHT);
 
-    json_t *json_font = json_object_get(fillenv->json_map_item, "font");
+    json_font = json_object_get(fillenv->json_map_item, "font");
     if(json_is_string(json_font)) {
         fillenv->sig.font = json_string_value(json_font);
         fillenv->sig.visible = 1;
@@ -30,29 +34,28 @@ fill_type fill_tpl_signature_data(pdf_env *env, fill_env *fillenv) {
         fillenv->sig.visible = 0;
     }
 
-    json_t *json_sigfile = json_object_get(fillenv->json_map_item, "sigfile");
+    json_sigfile = json_object_get(fillenv->json_map_item, "sigfile");
 
-    if(!json_is_string(json_sigfile) && !env->sigFile) {
+    if(!json_is_string(json_sigfile) && !env->fill.sig.file) {
         RETURN_FILL_ERROR(fillenv, "Sigfile not set");
     }
 
-    const char *sigfile = env->sigFile ? env->sigFile : json_string_value(json_sigfile);
+    sigfile = env->fill.sig.file ? env->fill.sig.file : json_string_value(json_sigfile);
 
-    struct stat buffer;
     if(stat(sigfile, &buffer) != 0) {
-        RETURN_FILL_ERROR(fillenv, "Sigfile not found");
+        RETURN_FILL_ERROR_ARG(fillenv, "Sigfile %s not found", sigfile);
     } else {
         fillenv->sig.file = sigfile;
     }
 
-    json_t *json_pwd = json_object_get(fillenv->json_map_item, "password");
+    json_pwd = json_object_get(fillenv->json_map_item, "password");
 
-    if(env->sigPwd) {
-        fillenv->sig.password = env->sigPwd;
-    } else if(json_is_string(json_pwd)) {
-        fillenv->sig.password = json_string_value(json_pwd);
-    } else {
-        RETURN_FILL_ERROR(fillenv, "Password not supplied");
+    if(!json_is_string(json_pwd) && !env->fill.sig.password) {
+        RETURN_FILL_ERROR(fillenv, "Password not given");
+    }
+
+    if(!env->fill.sig.password) {
+        env->fill.sig.password = json_string_value(json_pwd);
     }
 
     return ADD_SIGNATURE;

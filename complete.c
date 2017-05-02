@@ -183,7 +183,6 @@ int cmplt_fill_field(pdf_env *env, fill_env *fillenv) {
             break;
 
         default:
-            fprintf(stderr, "Error in '%s': %s\n", fillenv->input_key, fillenv->err_msg);
             break;
     }
 
@@ -212,11 +211,18 @@ int is_only_digits(const char *str) {
     return 1;
 }
 
-void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
+void cmplt_fill_all(pdf_env *env) {
     json_error_t json_err;
     fill_env fillenv = {0};
 
-    json_t *data_json = json_loadf(json_data_file, 0, &json_err);
+    FILE *data_file;
+
+    if(env->fill.dataFile)
+        data_file = fopen(env->fill.dataFile, "r");
+    else
+        data_file = stdin;
+
+    json_t *data_json = json_loadf(data_file, 0, &json_err);
 
     if (data_json == NULL)
         return;
@@ -228,15 +234,15 @@ void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
 
     fillenv.json_input_data = data_json;
 
-    json_t *template = json_load_file(env->optFile, 0, &json_err);
+    json_t *template = json_load_file(env->fill.tplFile, 0, &json_err);
 
     if (template == NULL) {
-        fprintf(stderr, "Unable to load template file '%s'", env->optFile);
+        fprintf(stderr, "Unable to load template file '%s'", env->fill.tplFile);
         goto tpl_exit;
     }
 
     if(!json_is_object(template)) {
-        fprintf(stderr, "Invalid template file '%s'. json root must be an object.", env->optFile);
+        fprintf(stderr, "Invalid template file '%s'. json root must be an object.", env->fill.tplFile);
         goto tpl_exit;
     }
 
@@ -272,14 +278,17 @@ void cmplt_fill_all(pdf_env *env, FILE *json_data_file) {
         updated_doc += updated_pg;
     }
 
-    cmplt_fcopy(env->inputPdf, env->outputPdf);
+    cmplt_fcopy(env->files.input, env->files.output);
     pdf_write_options opts = {0};
     opts.do_incremental = 1;
-    pdf_save_document(env->ctx, env->doc, env->outputPdf, &opts);
+    pdf_save_document(env->ctx, env->doc, env->files.output, &opts);
 
 tpl_exit:
     json_decref(template);
 
 data_exit:
     json_decref(data_json);
+
+    if(env->fill.dataFile)
+        fclose(data_file);
 }

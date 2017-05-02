@@ -18,14 +18,78 @@ static const char *get_type_name(fz_context *ctx, pdf_widget *widget) {
 }
 
 
+void parse_fields_doc(pdf_env *env) {
+    visit_funcs vfuncs = get_visitor_funcs(env->cmd);
+    visit_env visenv = {0};
+
+    fz_try(env->ctx) {
+        if(vfuncs.pre_visit_doc)
+            vfuncs.pre_visit_doc(env, &visenv);
+
+        for(int i = 0; i < env->page_count; i++) {
+            env->page_num = i;
+            env->page = pdf_load_page(env->ctx, env->doc, env->page_num);
+
+            if(vfuncs.pre_visit_page)
+                vfuncs.pre_visit_page(env, &visenv);
+
+            pdf_widget *widget = pdf_first_widget(env->ctx, env->doc, env->page);
+            int wid_count = 0;
+
+            while(widget) {
+                if(vfuncs.visit_widget)
+                    vfuncs.visit_widget(env, &visenv, widget, wid_count);
+
+                widget = pdf_next_widget(env->ctx, widget);
+                wid_count++;
+            }
+
+            if(vfuncs.post_visit_page)
+                vfuncs.post_visit_page(env, &visenv);
+        }
+
+        if(vfuncs.post_visit_doc)
+            vfuncs.post_visit_doc(env, &visenv);
+
+    } fz_catch(env->ctx) {
+        fprintf(stderr, "cannot get pages: %s\n", fz_caught_message(env->ctx));
+    }
+}
+
+
+visit_funcs get_visitor_funcs(int cmd) {
+    switch(cmd) {
+        case JSON_MAP: {
+            visit_funcs vf = {visit_doc_init_json, visit_page_init_json, visit_widget_jsonmap, visit_page_end_json, visit_doc_end_json};
+            return vf;
+        }
+
+        case JSON_LIST: {
+            visit_funcs vf = {visit_doc_init_json, visit_page_init_json, visit_field_jsonlist, visit_page_end_json, visit_doc_end_json};
+            return vf;
+        }
+
+        case FONT_LIST: {
+            visit_funcs vf = {visit_doc_init_json, visit_page_fontlist, visit_widget_fontlist, 0, visit_doc_end_json};
+            return vf;
+        }
+
+        case ANNOTATE_FIELDS: {
+            visit_funcs vf = {0, 0, visit_widget_overlay, visit_page_end_overlay, visit_doc_end_overlay};
+            return vf;
+        }
+    }
+}
+
+
 void visit_doc_init_json(pdf_env *env, visit_env *visenv) {
     visenv->json_root = json_object();
 }
 
 
 void visit_doc_end_json(pdf_env *env, visit_env *visenv) {
-    if(env->optFile) {
-        json_dump_file(visenv->json_root, env->optFile, JSON_INDENT(2));
+    if(env->files.output) {
+        json_dump_file(visenv->json_root, env->files.output, JSON_INDENT(2));
     } else {
         json_dumpf(visenv->json_root, stdout, JSON_INDENT(2));
     }
@@ -227,69 +291,23 @@ void visit_page_end_overlay(pdf_env *env, visit_env *visenv) {
 void visit_doc_end_overlay(pdf_env *env, visit_env *visenv) {
     pdf_write_options opts = {0};
     opts.do_incremental = 0;
-    pdf_save_document(env->ctx, env->doc, env->optFile, &opts);
-}
+    char *output_file;
+    char buf[256];
+    int len;
 
+    printf("SAVE PDF\n");
+    if(env->files.output) {
+        output_file = env->files.output;
+    } else {
+        printf("MAKE FILE\n");
+        len = strlen(env->files.input);
+        len = (len < 240) ? len - 4 : 240;
 
-visit_funcs get_visitor_funcs(int cmd) {
-    switch(cmd) {
-        case JSON_MAP: {
-            visit_funcs vf = {visit_doc_init_json, visit_page_init_json, visit_widget_jsonmap, visit_page_end_json, visit_doc_end_json};
-            return vf;
-        }
-
-        case JSON_LIST: {
-            visit_funcs vf = {visit_doc_init_json, visit_page_init_json, visit_field_jsonlist, visit_page_end_json, visit_doc_end_json};
-            return vf;
-        }
-
-        case FONT_LIST: {
-            visit_funcs vf = {visit_doc_init_json, visit_page_fontlist, visit_widget_fontlist, 0, visit_doc_end_json};
-            return vf;
-        }
-
-        case ANNOTATE_FIELDS: {
-            visit_funcs vf = {0, 0, visit_widget_overlay, visit_page_end_overlay, visit_doc_end_overlay};
-            return vf;
-        }
+        memcpy(buf, env->files.input, len);
+        memcpy(buf+len, "_annotated.pdf", 15);
+        output_file = buf;
+        printf("MAKE FILE: %s\n", buf);
     }
-}
 
-
-void parse_fields_doc(pdf_env *env) {
-    visit_funcs vfuncs = get_visitor_funcs(env->cmd);
-    visit_env visenv = {0};
-
-    fz_try(env->ctx) {
-        if(vfuncs.pre_visit_doc)
-            vfuncs.pre_visit_doc(env, &visenv);
-
-        for(int i = 0; i < env->page_count; i++) {
-            env->page_num = i;
-            env->page = pdf_load_page(env->ctx, env->doc, env->page_num);
-
-            if(vfuncs.pre_visit_page)
-                vfuncs.pre_visit_page(env, &visenv);
-
-            pdf_widget *widget = pdf_first_widget(env->ctx, env->doc, env->page);
-            int wid_count = 0;
-
-            while(widget) {
-                if(vfuncs.visit_widget)
-                    vfuncs.visit_widget(env, &visenv, widget, wid_count);
-
-                widget = pdf_next_widget(env->ctx, widget);
-                wid_count++;
-            }
-
-            if(vfuncs.post_visit_page)
-                vfuncs.post_visit_page(env, &visenv);
-        }
-
-        if(vfuncs.post_visit_doc)
-            vfuncs.post_visit_doc(env, &visenv);
-
-    } fz_catch(env->ctx) {
-        fprintf(stderr, "cannot get pages: %s\n", fz_caught_message(env->ctx));
-    }
+    pdf_save_document(env->ctx, env->doc, output_file, &opts);
 }
