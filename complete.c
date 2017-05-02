@@ -7,6 +7,166 @@
 #include "fill.h"
 
 
+
+void cmplt_fill_all(pdf_env *env) {
+    json_error_t json_err;
+
+    FILE *data_file;
+
+    if(env->fill.dataFile)
+        data_file = fopen(env->fill.dataFile, "r");
+    else
+        data_file = stdin;
+
+    json_t *data_json = json_loadf(data_file, 0, &json_err);
+
+    if (data_json == NULL)
+        return;
+
+    if (!json_is_object(data_json)) {
+        fprintf(stderr, "input data invalid. json root must be an object");
+        goto data_exit;
+    }
+
+    env->fill.json_input_data = data_json;
+
+    json_t *template = json_load_file(env->fill.tplFile, 0, &json_err);
+
+    if (template == NULL) {
+        fprintf(stderr, "Unable to load template file '%s'", env->fill.tplFile);
+        goto tpl_exit;
+    }
+
+    if(!json_is_object(template)) {
+        fprintf(stderr, "Invalid template file '%s'. json root must be an object.", env->fill.tplFile);
+        goto tpl_exit;
+    }
+
+    const char* obj_idx;
+    int page_idx, item_idx;
+    json_t *page_val, *item_val;
+
+    int updated_doc = 0;
+    json_object_foreach(template, obj_idx, page_val) {
+        // filter pages in the tpl.json.
+        if(!str_is_all_digits(obj_idx) || !json_is_array(page_val))
+            continue;
+
+        sscanf(obj_idx, "%d", &page_idx);
+        env->page_num = page_idx;
+
+        fz_try(env->ctx) {
+            env->page = pdf_load_page(env->ctx, env->doc, page_idx);
+        } fz_catch(env->ctx) {
+            fprintf(stderr, "cannot get pages: %s\n", fz_caught_message(env->ctx));
+            goto data_exit;
+        }
+
+        int updated_pg = 0;
+
+        json_array_foreach(page_val, item_idx, env->fill.json_map_item) {
+            updated_pg += cmplt_fill_field(env);
+        }
+
+        if(updated_pg)
+            pdf_update_page(env->ctx, env->page);
+
+        updated_doc += updated_pg;
+    }
+
+    cmplt_fcopy(env->files.input, env->files.output);
+    pdf_write_options opts = {0};
+    opts.do_incremental = 1;
+    pdf_save_document(env->ctx, env->doc, env->files.output, &opts);
+
+tpl_exit:
+    json_decref(template);
+
+data_exit:
+    json_decref(data_json);
+
+    if(env->fill.dataFile)
+        fclose(data_file);
+}
+
+
+
+int cmplt_fill_field(pdf_env *env) {
+    json_t *datakey = json_object_get(env->fill.json_map_item, "key");
+
+    if(datakey == NULL)
+        return 0;
+
+    if(!json_is_string(datakey))
+        return 0;
+
+    env->fill.input_key = json_string_value(datakey);
+    json_t *dataval = json_object_get(env->fill.json_input_data, env->fill.input_key);
+
+    if(dataval == NULL)
+        return 0;
+
+    switch(json_typeof(dataval)) {
+        case JSON_STRING:
+            env->fill.input_data = json_string_value(dataval);
+            break;
+
+        case JSON_TRUE:
+        case JSON_FALSE:
+            env->fill.input_data = json_is_true(dataval) ? "1" : "0";
+            break;
+
+        default:
+            return 0;
+
+    }
+
+    if(env->fill.input_data == NULL)
+        return 0;
+
+    int updated = 0;
+    pdf_widget *widget;
+
+    switch(map_input_data(env)) {
+        case FIELD_ID:
+            widget = cmplt_find_widget_id(env->ctx, env->page, env->fill.field_id);
+            updated = cmplt_set_widget_value(env, widget, env->fill.input_data);
+            break;
+
+        case FIELD_NAME:
+            widget = cmplt_find_widget_name(env->ctx, env->page, env->fill.field_name);
+            updated = cmplt_set_widget_value(env, widget, env->fill.input_data);
+            break;
+
+        case ADD_TEXTFIELD:
+            updated = cmplt_add_textfield(env);
+            break;
+
+        case ADD_SIGNATURE:
+            updated = cmplt_add_signature(env);
+            break;
+
+        default:
+            break;
+    }
+
+    return updated;
+}
+
+int cmplt_fcopy(const char *src, const char *dest) {
+    FILE *in = fopen(src, "r");
+    FILE *out = fopen(dest, "w");
+    char buf[CP_BUFSIZE];
+    int numbytes;
+
+    while(0 < (numbytes = fread(buf, 1, CP_BUFSIZE, in)))
+        fwrite(buf, 1, numbytes, out);
+
+    fclose(in);
+    fclose(out);
+}
+
+
 void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field) {
     int ffval = pdf_to_int(ctx, pdf_dict_get(ctx, field, PDF_NAME_Ff));
     pdf_obj *ffobj = pdf_new_int(ctx, doc, ffval | Ff_ReadOnly);
@@ -127,167 +287,10 @@ int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data) {
 }
 
 
-int cmplt_fill_field(pdf_env *env) {
-    json_t *datakey = json_object_get(env->fill.json_map_item, "key");
-
-    if(datakey == NULL)
-        return 0;
-
-    if(!json_is_string(datakey))
-        return 0;
-
-    env->fill.input_key = json_string_value(datakey);
-    json_t *dataval = json_object_get(env->fill.json_input_data, env->fill.input_key);
-
-    if(dataval == NULL)
-        return 0;
-
-    switch(json_typeof(dataval)) {
-        case JSON_STRING:
-            env->fill.input_data = json_string_value(dataval);
-            break;
-
-        case JSON_TRUE:
-        case JSON_FALSE:
-            env->fill.input_data = json_is_true(dataval) ? "1" : "0";
-            break;
-
-        default:
-            return 0;
-
-    }
-
-    if(env->fill.input_data == NULL)
-        return 0;
-
-    int updated = 0;
-    pdf_widget *widget;
-
-    switch(fill_tpl_data(env)) {
-        case FIELD_ID:
-            widget = cmplt_find_widget_id(env->ctx, env->page, env->fill.field_id);
-            updated = cmplt_set_widget_value(env, widget, env->fill.input_data);
-            break;
-
-        case FIELD_NAME:
-            widget = cmplt_find_widget_name(env->ctx, env->page, env->fill.field_name);
-            updated = cmplt_set_widget_value(env, widget, env->fill.input_data);
-            break;
-
-        case ADD_TEXTFIELD:
-            updated = cmplt_add_textfield(env);
-            break;
-
-        case ADD_SIGNATURE:
-            updated = cmplt_add_signature(env);
-            break;
-
-        default:
-            break;
-    }
-
-    return updated;
-}
-
-
-int cmplt_fcopy(const char *src, const char *dest) {
-    FILE *in = fopen(src, "r");
-    FILE *out = fopen(dest, "w");
-    char buf[CP_BUFSIZE];
-    int numbytes;
-
-    while(0 < (numbytes = fread(buf, 1, CP_BUFSIZE, in)))
-        fwrite(buf, 1, numbytes, out);
-
-    fclose(in);
-    fclose(out);
-}
-
-int is_only_digits(const char *str) {
+int str_is_all_digits(const char *str) {
     while(*str)
         if(!isdigit(*str++))
             return 0;
 
     return 1;
-}
-
-void cmplt_fill_all(pdf_env *env) {
-    json_error_t json_err;
-
-    FILE *data_file;
-
-    if(env->fill.dataFile)
-        data_file = fopen(env->fill.dataFile, "r");
-    else
-        data_file = stdin;
-
-    json_t *data_json = json_loadf(data_file, 0, &json_err);
-
-    if (data_json == NULL)
-        return;
-
-    if (!json_is_object(data_json)) {
-        fprintf(stderr, "input data invalid. json root must be an object");
-        goto data_exit;
-    }
-
-    env->fill.json_input_data = data_json;
-
-    json_t *template = json_load_file(env->fill.tplFile, 0, &json_err);
-
-    if (template == NULL) {
-        fprintf(stderr, "Unable to load template file '%s'", env->fill.tplFile);
-        goto tpl_exit;
-    }
-
-    if(!json_is_object(template)) {
-        fprintf(stderr, "Invalid template file '%s'. json root must be an object.", env->fill.tplFile);
-        goto tpl_exit;
-    }
-
-    const char* obj_idx;
-    int page_idx, item_idx;
-    json_t *page_val, *item_val;
-
-    int updated_doc = 0;
-    json_object_foreach(template, obj_idx, page_val) {
-        // filter pages in the tpl.json.
-        if(!is_only_digits(obj_idx) || !json_is_array(page_val))
-            continue;
-
-        sscanf(obj_idx, "%d", &page_idx);
-        env->page_num = page_idx;
-
-        fz_try(env->ctx) {
-            env->page = pdf_load_page(env->ctx, env->doc, page_idx);
-        } fz_catch(env->ctx) {
-            fprintf(stderr, "cannot get pages: %s\n", fz_caught_message(env->ctx));
-            goto data_exit;
-        }
-
-        int updated_pg = 0;
-
-        json_array_foreach(page_val, item_idx, env->fill.json_map_item) {
-            updated_pg += cmplt_fill_field(env);
-        }
-
-        if(updated_pg)
-            pdf_update_page(env->ctx, env->page);
-
-        updated_doc += updated_pg;
-    }
-
-    cmplt_fcopy(env->files.input, env->files.output);
-    pdf_write_options opts = {0};
-    opts.do_incremental = 1;
-    pdf_save_document(env->ctx, env->doc, env->files.output, &opts);
-
-tpl_exit:
-    json_decref(template);
-
-data_exit:
-    json_decref(data_json);
-
-    if(env->fill.dataFile)
-        fclose(data_file);
 }

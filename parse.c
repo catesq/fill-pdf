@@ -6,7 +6,6 @@
 
 static const char *typeNames[] = { "pushbutton", "checkbox", "radiobutton", "textfield", "listbox", "combobox", "signature" };
 
-
 static const char *get_type_name(fz_context *ctx, pdf_widget *widget) {
     int type = pdf_widget_type(ctx, widget);
 

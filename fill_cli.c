@@ -12,7 +12,6 @@ const char *command_names[CMD_COUNT] = {
     "annot", "info", "template", "fonts", "complete"
 };
 
-
 void usage_message(int cmd) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "  fillpdf <command> [options] input.pdf [output]\n");
@@ -55,7 +54,7 @@ void usage_message(int cmd) {
 }
 
 
-int read_info_cmd_args(int argc, char **argv, pdf_env *env) {
+int read_parse_cmd_args(int argc, char **argv, pdf_env *env) {
     env->files.input = argv[2];
 
     if(argc == 4) {
@@ -148,7 +147,7 @@ int read_args(int argc, char **argv, pdf_env *env) {
     if(env->cmd == COMPLETE_PDF) {
         return read_completion_cmd_args(argc, argv, env);;
     } else {
-        return read_info_cmd_args(argc, argv, env);
+        return read_parse_cmd_args(argc, argv, env);
     }
 }
 

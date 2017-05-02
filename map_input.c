@@ -1,6 +1,6 @@
 #include "fill.h"
 
-double fill_tpl_get_number(json_t *jsn_obj, const char *property, float default_val, float min_val) {
+double map_input_number(json_t *jsn_obj, const char *property, float default_val, float min_val) {
     json_t *jsn_val = json_object_get(jsn_obj, property);
 
     if(json_is_number(jsn_val) && json_number_value(jsn_val) >= min_val) {
@@ -10,20 +10,20 @@ double fill_tpl_get_number(json_t *jsn_obj, const char *property, float default_
     }
 }
 
-void fill_tpl_get_position_data(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height) {
-    pos->left = fill_tpl_get_number(jsn_obj, "left", default_xy, 0);
-    pos->top = fill_tpl_get_number(jsn_obj, "top", default_xy, 0);
-    pos->right = pos->left + fill_tpl_get_number(jsn_obj, "width", default_width, 1);
-    pos->bottom = pos->top + fill_tpl_get_number(jsn_obj, "height", default_height, 1);
+void map_input_posdata(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height) {
+    pos->left = map_input_number(jsn_obj, "left", default_xy, 0);
+    pos->top = map_input_number(jsn_obj, "top", default_xy, 0);
+    pos->right = pos->left + map_input_number(jsn_obj, "width", default_width, 1);
+    pos->bottom = pos->top + map_input_number(jsn_obj, "height", default_height, 1);
 }
 
 
-fill_type fill_tpl_signature_data(pdf_env *env) {
+fill_type map_input_signature(pdf_env *env) {
     const char *sigfile = NULL;
     json_t *json_sigfile = NULL, *json_font = NULL, *json_pwd;
     struct stat buffer;
 
-    fill_tpl_get_position_data(json_object_get(env->fill.json_map_item, "rect"), &env->fill.sig.pos, 0, DEFAULT_SIG_WIDTH, DEFAULT_SIG_HEIGHT);
+    map_input_posdata(json_object_get(env->fill.json_map_item, "rect"), &env->fill.sig.pos, 0, DEFAULT_SIG_WIDTH, DEFAULT_SIG_HEIGHT);
 
     json_font = json_object_get(env->fill.json_map_item, "font");
     if(json_is_string(json_font)) {
@@ -62,8 +62,8 @@ fill_type fill_tpl_signature_data(pdf_env *env) {
 }
 
 
-fill_type fill_tpl_text_data(pdf_env *env, fill_type success_type) {
-    fill_tpl_get_position_data(json_object_get(env->fill.json_map_item, "rect"), &env->fill.text.pos, -1, DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
+fill_type map_input_textfield(pdf_env *env, fill_type success_type) {
+    map_input_posdata(json_object_get(env->fill.json_map_item, "rect"), &env->fill.text.pos, -1, DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
 
     if(env->fill.text.pos.left < 0 || env->fill.text.pos.top < 0) {
         RETURN_FILL_ERROR("Position invalid");
@@ -98,7 +98,7 @@ fill_type fill_tpl_text_data(pdf_env *env, fill_type success_type) {
 }
 
 
-fill_type fill_tpl_data(pdf_env *env) {
+fill_type map_input_data(pdf_env *env) {
     json_t *json_id = json_object_get(env->fill.json_map_item, "id");
     if(json_id != NULL) {
         if (!json_is_integer(json_id)) {
@@ -128,9 +128,9 @@ fill_type fill_tpl_data(pdf_env *env) {
     const char *type_name = json_string_value(json_addtype);
 
     if(strncmp(type_name, "textfield", 13) == 0) {
-        return fill_tpl_text_data(env, ADD_TEXTFIELD);
+        return map_input_textfield(env, ADD_TEXTFIELD);
     } else if(strncmp(type_name, "signature", 9) == 0) {
-        return fill_tpl_signature_data(env);
+        return map_input_signature(env);
     } else {
         RETURN_FILL_ERROR("Trying to add an unrecognised type. Only 'textfield' and 'signature' supported.");
     }

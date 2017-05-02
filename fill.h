@@ -133,7 +133,7 @@ typedef struct {
 
 //fill.c
 void usage_message(int cmd);
-int read_info_cmd_args(int argc, char **argv, pdf_env *env);
+int read_parse_cmd_args(int argc, char **argv, pdf_env *env);
 int read_completion_cmd_args(int argc, char **argv, pdf_env *env);
 command get_command(char *cmd);
 const char *command_name(command cmd);
@@ -141,25 +141,24 @@ int read_args(int argc, char **argv, pdf_env *env);
 int main(int argc, char **argv);
 
 //complete.c
+int cmplt_fill_field(pdf_env *env);
+void cmplt_fill_all(pdf_env *env);
 int cmplt_da_str(const char *font, float *color, char *buf);
 void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field);
 int cmplt_fcopy(const char *src, const char *dest);
-int cmplt_add_textfield(pdf_env *env);
 int cmplt_add_signature(pdf_env *env);
+int cmplt_add_textfield(pdf_env *env);
+int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data);
 pdf_widget *cmplt_find_widget_name(fz_context *ctx, pdf_page *page, const char *field_name);
 pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id);
-int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data);
-int cmplt_fill_field(pdf_env *env);
-void cmplt_fill_all(pdf_env *env);
-pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id);
+int str_is_all_digits(const char *str);
 
-//fill_tpl.c
-double fill_tpl_get_number(json_t *jsn_obj, const char *property, float default_val, float min_val);
-void fill_tpl_get_position_data(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height);
-fill_type fill_tpl_signature_data(pdf_env *env);
-fill_type fill_tpl_text_data(pdf_env *env, fill_type success_type);
-fill_type fill_tpl_data(pdf_env *env);
-
+//map_input.c
+double map_input_number(json_t *jsn_obj, const char *property, float default_val, float min_val);
+void map_input_posdata(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height);
+fill_type map_input_signature(pdf_env *env);
+fill_type map_input_textfield(pdf_env *env, fill_type success_type);
+fill_type map_input_data(pdf_env *env);
 
 //parse.c
 visit_funcs get_visitor_funcs(int cmd);
