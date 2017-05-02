@@ -1,12 +1,16 @@
+# Overview
+
+Work in progress.
+
 # Dependencies
 
 ```apt-get install libjansson-dev libssl-dev zlib1g-dev```
 
-The dependecies are minimal as the build compiles mupdf from a source tar and mupdf compiles most of it's own dependencies.
+The dependencies are minimal as mupdf is built from source and mudpf source packages contain patched versions of it's dependencies.
 
 # Build instructions
 
-The usual cmake process
+The usual cmake process:
 
 ```mkdir build-dir
 cd build-dir
@@ -16,20 +20,33 @@ make
 
 fillpdf should now be ready for use in build-dir
 
+# Basic usage
 
-# Usage
+```fillpdf <command> [options] input.pdf [output_file]```
 
-fillpdf needs three input files. 
+Where command is one of: `annot, info, template, fonts, complete`
 
-1. A json template which maps pdf form field names to the input data name. The root json node is an object, property names on the root object are page numbers, the values for each page is an array containing all form fields on that page (extra textfields and digital signature can also be added here)
-2. An input data json file. Root node is an object, it's keys are input data names, the values are inserted into the pdf form.
-3. The pdf file
-
-The skeleton template should be generated with `fillpdf -j new_tpl.json fill_this.pdf` or dumped to stdout usinf `fillpdf -t fill_this.pdf`
-
-eg
+There is a mandatory setup step: 
 ```
-new_tpl.json
+fillpdf template input.pdf template.json
+```
+Will build a template containing the name, object id and input widget type of all the data fields on each page of the pdf. 
+
+Then:
+```
+fillpdf complete -d input_data.json -t template.json input.pdf complete.pdf
+```
+Where input_data.json is a json file with a single object where the keys are the field names and values are data to insert into the pdf. 
+
+# Walk through
+
+Using the fw9.pdf form in examples directory as a guide.
+
+The skeleton template generated with `fillpdf template fw9.pdf fw9_template.json looks something like this`
+
+"0" is a page number, the value are a json list of fields
+```
+fw9_template.json
 {
   "0": [
     {
@@ -45,14 +62,30 @@ new_tpl.json
     ...
 }
 ```
+The name's are often machine generated nonsense and it's usually unclear which name in the template releates to which field on the pdf so it is recommmended to fill in the "key" property with meaningful data names 
 
-Now the template file must be completed by adding the "key" value for each form field you want fill (and adding extra fields required).
-
-To help fill in the template generate a pdf file with the object numbers annotations using`fillpdf -a annotated.pdf fill_this.pdf`. It makes annotated.pdf a clone of fill_this.pdf so you know which field on the pdf relates to which item in the template file and meaningful data names can be used.
-
+So the input data can be written with meaningful names like:
 
 ```
-new_tpl.json
+input_data.json
+{
+	 "personal_name": "A. Smith", 
+	 "business_name": "Smith Business",
+   ...
+}
+```
+
+To do this use the annot command:
+```
+fillpdf annot fw9.pdf fw9_annotated.pdf
+```
+
+It create a pdf with the object ID of each field annotated in bright red over the middle of each object - trying to edit the fw9_template is guesswork without it.
+
+Using the annotated pdf it's easy to add sensible names to the template:
+
+```
+fw9_template_edited.json
 {
   "0": [
     {
@@ -69,50 +102,27 @@ new_tpl.json
 }
 ```
 
-Now the fillpdf tool can complete the form. With input data like
+# Add signatures to the template
 
-```
-input_data.json
-{
-	 "personal_name": "A. Smith", 
-	 "business_name": "SmithCo",
-   ...
-}
-```
-
-# Then
-
-```
-fillpdf -m new_tpl.json -d input_data.json fill_in.pdf output.pdf
-``` 
-
-Will copy the input data into fill_in.pdf and create output.pdf.
-
-# Add things
-If you want to sign the document add a new signature item to the items of any page in new_tpl.json
+To digitally sign the document you must add a signature item to the template. Append this to the list of fields 
 
 
 ```
 {
       "add": "signature",
-      "key": "addsig"
-}
-```
-`
-It also needs `"addsig": true` in the input_data.json. 
-
-To make the signature visible it the add: signature item needs to specify the font and size. Fonts are only partly support by the fillpdf tool at the moment and only works with fonts that are already defined in the input.pdf. Use `fillpdf -f input.pdf` and choose one of the few fonts listed in widget_fonts property. eg
-
-```
-{
-      "add": "signature",
-      "font": "Helv",
-      "rect": {"left": 490, "top":510, "width": 40, "height": 40},
-      "key": "addsig"
+      "key": "addsig",
+      "rect":  {"left": 490, "top":510, "width": 40, "height": 40},
 }
 ```
 
-Textfields can be added in a similar method to signature by changing "add":"signature" to "add":"textfield" and use the -s & -p options of fillpdf to specify the sigfile and password.
+The "rect" item is mandatory. The value of key can be whatever you like. 
+Note that the digital signature is only added when when input_data.json contains `"addsig": true`. When "addsig" is false or undefined it is not. 
+
+There can be an optional font property on the "signature" item. fillpdf currently doesn't have much support for fonts and can only use fonts which are available for use by widgets in that pdf - use one of the fonts the "widget_fonts" list returned `fillpdf fonts fw9.pdf`. 
+
+# Add textfields using template
+
+Textfields can be added in a similar method to signature by changing "add":"signature" to "add":"textfield".
 
 # To do
-Most useful features would be better (proper) support for fonts, being able to add images, adding text without pretending it's non-editable a textfield, annotations too. Possibly making the clunky template prep optional and adding everything to a more complex input_data json. 
+Most useful features would be better (proper) support for fonts, being able to add images, adding text without pretending it's a non-editable textfield, annotations maybe. Possibly making the clunky template prep optional and adding everything to a more complex input_data json. 
