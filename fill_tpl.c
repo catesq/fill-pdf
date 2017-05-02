@@ -35,27 +35,27 @@ fill_type fill_tpl_signature_data(pdf_env *env) {
     }
 
     json_sigfile = json_object_get(env->fill.json_map_item, "sigfile");
-
-    if(!json_is_string(json_sigfile) && !env->fill.sig.file) {
-        RETURN_FILL_ERROR(fillenv, "Sigfile not set");
+    if(env->fill.certFile) {
+        sigfile = env->fill.certFile;
+    } else if(json_is_string(json_sigfile)) {
+        sigfile = json_string_value(json_sigfile);
+    } else {
+        RETURN_FILL_ERROR("Sigfile not set");
     }
 
-    sigfile = env->fill.sig.file ? env->fill.sig.file : json_string_value(json_sigfile);
-
     if(stat(sigfile, &buffer) != 0) {
-        RETURN_FILL_ERROR_ARG(fillenv, "Sigfile %s not found", sigfile);
+        RETURN_FILL_ERROR_ARG("Sigfile %s not found", sigfile);
     } else {
         env->fill.sig.file = sigfile;
     }
 
     json_pwd = json_object_get(env->fill.json_map_item, "password");
-
-    if(!json_is_string(json_pwd) && !env->fill.sig.password) {
-        RETURN_FILL_ERROR(fillenv, "Password not given");
-    }
-
-    if(!env->fill.sig.password) {
+    if(env->fill.certPwd) {
+        env->fill.sig.password = env->fill.certPwd;
+    } else if(json_is_string(json_pwd)) {
         env->fill.sig.password = json_string_value(json_pwd);
+    } else {
+        RETURN_FILL_ERROR("Password not given");
     }
 
     return ADD_SIGNATURE;
@@ -66,7 +66,7 @@ fill_type fill_tpl_text_data(pdf_env *env, fill_type success_type) {
     fill_tpl_get_position_data(json_object_get(env->fill.json_map_item, "rect"), &env->fill.text.pos, -1, DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
 
     if(env->fill.text.pos.left < 0 || env->fill.text.pos.top < 0) {
-        RETURN_FILL_ERROR(fillenv, "Position invalid");
+        RETURN_FILL_ERROR("Position invalid");
     }
 
     json_t *json_edit = json_object_get(env->fill.json_map_item, "editable");
@@ -102,7 +102,7 @@ fill_type fill_tpl_data(pdf_env *env) {
     json_t *json_id = json_object_get(env->fill.json_map_item, "id");
     if(json_id != NULL) {
         if (!json_is_integer(json_id)) {
-            RETURN_FILL_ERROR(fillenv, "Invalid field id, must be an integer");
+            RETURN_FILL_ERROR("Invalid field id, must be an integer");
         }
 
         env->fill.field_id = json_integer_value(json_id);
@@ -112,7 +112,7 @@ fill_type fill_tpl_data(pdf_env *env) {
     json_t *json_name = json_object_get(env->fill.json_map_item, "name");
     if(json_name != NULL) {
         if (!json_is_string(json_name)) {
-            RETURN_FILL_ERROR(fillenv, "Invalid field name, must be a string");
+            RETURN_FILL_ERROR("Invalid field name, must be a string");
         }
 
         env->fill.field_name = json_string_value(json_name);
@@ -122,7 +122,7 @@ fill_type fill_tpl_data(pdf_env *env) {
     json_t *json_addtype = json_object_get(env->fill.json_map_item, "add");
 
     if(json_addtype == NULL) {
-        RETURN_FILL_ERROR(fillenv, "Unrecognised template object. Needs an 'id', 'name' or 'add' property.");
+        RETURN_FILL_ERROR("Unrecognised template object. Needs an 'id', 'name' or 'add' property.");
     }
 
     const char *type_name = json_string_value(json_addtype);
@@ -132,7 +132,7 @@ fill_type fill_tpl_data(pdf_env *env) {
     } else if(strncmp(type_name, "signature", 9) == 0) {
         return fill_tpl_signature_data(env);
     } else {
-        RETURN_FILL_ERROR(fillenv, "Trying to add an unrecognised type. Only 'textfield' and 'signature' supported.");
+        RETURN_FILL_ERROR("Trying to add an unrecognised type. Only 'textfield' and 'signature' supported.");
     }
 
 }

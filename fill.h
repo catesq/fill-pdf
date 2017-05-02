@@ -27,12 +27,12 @@ const char *command_names[CMD_COUNT];
 
 #define UTF8_FIELD_NAME(ctx, obj) pdf_to_utf8(ctx, pdf_dict_get(ctx, obj, PDF_NAME_T));
 
-#define RETURN_FILL_ERROR(fillenv, err) { \
+#define RETURN_FILL_ERROR(err) { \
     fprintf(stderr, err); \
     return FILL_DATA_INVALID; \
 }
 
-#define RETURN_FILL_ERROR_ARG(fillenv, err, arg) { \
+#define RETURN_FILL_ERROR_ARG(err, arg) { \
     fprintf(stderr, err, arg); \
     return FILL_DATA_INVALID; \
 }
@@ -71,6 +71,8 @@ typedef struct {
     files_env files;
     char *dataFile;
     char *tplFile;
+    char *certFile;
+    char *certPwd;
 
     json_t *json_map_item;
     json_t *json_input_data;

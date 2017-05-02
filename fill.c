@@ -71,7 +71,7 @@ int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
     argc--;
     argv++;
 
-    while((arg = getopt(argc, argv, "t:d:s:p")) != -1) {
+    while((arg = getopt(argc, argv, "t:d:s:p:")) != -1) {
         switch(arg) {
         case 't':
             env->fill.tplFile = optarg;
@@ -82,11 +82,11 @@ int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
             break;
 
         case 's':
-            env->fill.sig.file = optarg;
+            env->fill.certFile = optarg;
             break;
 
         case 'p':
-            env->fill.sig.password = optarg;
+            env->fill.certPwd = optarg;
             break;
         }
     }

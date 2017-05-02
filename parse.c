@@ -17,7 +17,6 @@ static const char *get_type_name(fz_context *ctx, pdf_widget *widget) {
     }
 }
 
-
 void parse_fields_doc(pdf_env *env) {
     visit_funcs vfuncs = get_visitor_funcs(env->cmd);
 
