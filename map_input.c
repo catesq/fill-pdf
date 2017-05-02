@@ -25,6 +25,9 @@ fill_type map_input_signature(pdf_env *env) {
 
     map_input_posdata(json_object_get(env->fill.json_map_item, "rect"), &env->fill.sig.pos, 0, DEFAULT_SIG_WIDTH, DEFAULT_SIG_HEIGHT);
 
+    env->fill.sig.widget_name = env->fill.input_key;
+    env->fill.sig.page_num = env->page_num;
+
     json_font = json_object_get(env->fill.json_map_item, "font");
     if(json_is_string(json_font)) {
         env->fill.sig.font = json_string_value(json_font);

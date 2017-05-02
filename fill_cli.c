@@ -6,8 +6,6 @@
 
 #include "fill.h"
 
-extern fz_document_handler pdf_document_handler;
-
 const char *command_names[CMD_COUNT] = {
     "annot", "info", "template", "fonts", "complete"
 };

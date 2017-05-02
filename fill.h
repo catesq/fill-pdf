@@ -12,6 +12,7 @@ typedef enum {ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} com
 #define CMD_COUNT 5
 
 const char *command_names[CMD_COUNT];
+extern fz_document_handler pdf_document_handler;
 
 
 #define DEFAULT_SIG_WIDTH 100
@@ -47,10 +48,12 @@ typedef struct {
 
 typedef struct {
     pos_data pos;
+    const char *widget_name;
     const char *font;
     const char *file;
     const char *password;
     int visible;
+    int page_num;
 } signature_data;
 
 
@@ -113,6 +116,9 @@ typedef struct {
     _visit_env parse;
     files_env files;
   };
+
+  int add_sig;
+  signature_data add_sig_data;
 } pdf_env;
 
 
@@ -140,13 +146,16 @@ const char *command_name(command cmd);
 int read_args(int argc, char **argv, pdf_env *env);
 int main(int argc, char **argv);
 
+
 //complete.c
 int cmplt_fill_field(pdf_env *env);
 void cmplt_fill_all(pdf_env *env);
 int cmplt_da_str(const char *font, float *color, char *buf);
 void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field);
 int cmplt_fcopy(const char *src, const char *dest);
-int cmplt_add_signature(pdf_env *env);
+static int cmplt_sign_and_save(pdf_env *env);
+
+int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, signature_data *sig);
 int cmplt_add_textfield(pdf_env *env);
 int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data);
 pdf_widget *cmplt_find_widget_name(fz_context *ctx, pdf_page *page, const char *field_name);

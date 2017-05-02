@@ -224,7 +224,6 @@ json_t *visit_field_json_shared(fz_context *ctx, pdf_document *doc, pdf_widget *
 
     char *utf8_name = UTF8_FIELD_NAME(ctx, annot->obj);
     json_object_set_new(jsobj, "name", json_string(utf8_name));
-    fz_free(ctx, utf8_name);
 
     return jsobj;
 }
