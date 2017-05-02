@@ -53,10 +53,6 @@ static void usage_message(int cmd) {
         fprintf(stderr, "  output.pdf defaults to an auto-generated filename based on the input filename.\n");
         fprintf(stderr, "\n");
     }
-
-    fprintf(stderr, "Other notes:\n");
-
-
 }
 
 
@@ -100,7 +96,7 @@ static int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
         env->files.input = argv[optind];
     } else {
         fprintf(stderr, "Error: Input filename missing\n\n");
-        return EXIT_FAILURE;
+        return 0;
     }
 
     optind++;
@@ -109,7 +105,7 @@ static int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
         env->files.output = argv[optind];
     }
 
-    return EXIT_SUCCESS;
+    return 1;
 }
 
 
@@ -129,7 +125,7 @@ static int read_args(int argc, char **argv, pdf_env *env) {
     if(argc == 1) {
         fprintf(stderr, "Error: No sub-command, or input file, given.\n\n");
         usage_message(-1);
-        return EXIT_FAILURE;
+        return 0;
     }
 
     env->cmd = get_command(argv[1]);
@@ -137,12 +133,12 @@ static int read_args(int argc, char **argv, pdf_env *env) {
     if (argc == 2) {
         fprintf(stderr, "Error: No input file given.\n\n");
         usage_message(env->cmd);
-        return EXIT_FAILURE;
+        return 0;
     }
 
     switch(env->cmd) {
         case -1:
-            return EXIT_FAILURE;
+            return 0;
 
         case COMPLETE_PDF:
             return read_completion_cmd_args(argc, argv, env);;
@@ -162,6 +158,7 @@ int main(int argc, char **argv) {
 
     if(!(retval = read_args(argc, argv, env))) {
         usage_message(env->cmd);
+        retval = EXIT_FAILURE;
         goto main_exit;
     }
 
@@ -169,6 +166,7 @@ int main(int argc, char **argv) {
 
     if (!env->ctx)	{
         fprintf(stderr, "cannot create mupdf context\n");
+        retval = EXIT_FAILURE;
         goto main_exit;
     }
 
@@ -177,40 +175,35 @@ int main(int argc, char **argv) {
         fz_register_document_handler(env->ctx, &pdf_document_handler);
     } fz_catch(env->ctx)	{
         fprintf(stderr, "cannot register document handlers: %s\n", fz_caught_message(env->ctx));
-        caught_err = 1;
+        retval = EXIT_FAILURE;
     }
 
-    if(caught_err) goto main_exit_ctxt;
+    if(retval == EXIT_FAILURE) goto main_exit_ctxt;
 
     /* Open the document. */
     fz_try(env->ctx) {
         env->doc = pdf_open_document(env->ctx, env->files.input);
     } fz_catch(env->ctx)	{
         fprintf(stderr, "cannot open document: %s\n", fz_caught_message(env->ctx));
-        caught_err = 1;
+        retval = EXIT_FAILURE;
     }
 
-    if(caught_err) goto main_exit_ctxt;
+    if(retval = EXIT_FAILURE) goto main_exit_ctxt;
 
     /* Count the number of pages. */
     fz_try(env->ctx) {
         env->page_count = pdf_count_pages(env->ctx, env->doc);
     } fz_catch(env->ctx)	{
         fprintf(stderr, "cannot count number of pages: %s\n", fz_caught_message(env->ctx));
-        caught_err = 1;
+        retval = EXIT_FAILURE;
     }
 
-    if(caught_err) goto main_exit_doc;
+    if(retval = EXIT_FAILURE) goto main_exit_doc;
 
-    switch(env->cmd) {
-        case COMPLETE_PDF: {
-            cmplt_fill_all(env);
-            break;
-        }
-
-        default:
-            parse_fields_doc(env);
-            break;
+    if(env->cmd == COMPLETE_PDF) {
+        cmplt_fill_all(env);
+    } else {
+        parse_fields_doc(env);
     }
 
 main_exit_doc:
