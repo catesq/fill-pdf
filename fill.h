@@ -9,6 +9,11 @@ typedef enum {FILL_DATA_INVALID, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_SIGNAT
 
 typedef enum {ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} command;
 
+#define CMD_COUNT 5
+
+const char *command_names[CMD_COUNT];
+
+
 #define DEFAULT_SIG_WIDTH 100
 #define DEFAULT_SIG_HEIGHT 100
 
@@ -87,7 +92,7 @@ typedef struct  {
     files_env files;
     json_t *json_root;
     json_t *json_item;
-} visit_env;
+} _visit_env;
 
 
 typedef struct {
@@ -103,17 +108,17 @@ typedef struct {
 
   union {
     _fill_env fill;
-    visit_env parse;
+    _visit_env parse;
     files_env files;
   };
 } pdf_env;
 
 
-typedef void (*pre_visit_doc_func)(pdf_env *, visit_env *);
-typedef void (*pre_visit_page_func)(pdf_env *, visit_env *);
-typedef void (*visit_widget_func)(pdf_env *, visit_env *, pdf_widget *w, int widget_num);
-typedef void (*post_visit_page_func)(pdf_env *, visit_env *);
-typedef void (*post_visit_doc_func)(pdf_env *, visit_env *);
+typedef void (*pre_visit_doc_func)(pdf_env *);
+typedef void (*pre_visit_page_func)(pdf_env *);
+typedef void (*visit_widget_func)(pdf_env *, pdf_widget *w, int widget_num);
+typedef void (*post_visit_page_func)(pdf_env *);
+typedef void (*post_visit_doc_func)(pdf_env *);
 
 
 typedef struct {
@@ -123,6 +128,15 @@ typedef struct {
     pre_visit_page_func post_visit_page;
     pre_visit_doc_func post_visit_doc;
 } visit_funcs;
+
+//fill.c
+void usage_message(int cmd);
+int read_info_cmd_args(int argc, char **argv, pdf_env *env);
+int read_completion_cmd_args(int argc, char **argv, pdf_env *env);
+command get_command(char *cmd);
+const char *command_name(command cmd);
+int read_args(int argc, char **argv, pdf_env *env);
+int main(int argc, char **argv);
 
 //complete.c
 int cmplt_da_str(const char *font, float *color, char *buf);
@@ -149,22 +163,21 @@ fill_type fill_tpl_data(pdf_env *env);
 visit_funcs get_visitor_funcs(int cmd);
 void parse_fields_doc(pdf_env *env);
 void parse_fields_page(pdf_env *env, int page_num);
-int parse_args(int argc, char **argv, pdf_env *env);
 
-void visit_page_fontlist(pdf_env *penv, visit_env *venv);
-void visit_doc_end_fontlist(pdf_env *penv, visit_env *venv);
-void visit_widget_fontlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, int widget_num);
+void visit_page_fontlist(pdf_env *penv);
+void visit_doc_end_fontlist(pdf_env *penv);
+void visit_widget_fontlist(pdf_env *env, pdf_widget *widget, int widget_num);
 
-void visit_doc_init_json(pdf_env *penv, visit_env *venv);
-void visit_page_init_json(pdf_env *penv, visit_env *venv);
-void visit_page_end_json(pdf_env *penv, visit_env *venv);
-void visit_doc_end_json(pdf_env *penv, visit_env *venv);
-void visit_widget_jsonmap(pdf_env *penv, visit_env *venv, pdf_widget *widget, int widget_num);
-void visit_field_jsonlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, int widget_num);
+void visit_doc_init_json(pdf_env *penv);
+void visit_page_init_json(pdf_env *penv);
+void visit_page_end_json(pdf_env *penv);
+void visit_doc_end_json(pdf_env *penv);
+void visit_widget_jsonmap(pdf_env *penv, pdf_widget *widget, int widget_num);
+void visit_field_jsonlist(pdf_env *env, pdf_widget *widget, int widget_num);
 json_t *visit_field_json_shared(fz_context *ctx, pdf_document *doc, pdf_widget *widget);
 
-void visit_widget_overlay(pdf_env *penv, visit_env *venv, pdf_widget *widget, int widget_num);
-void visit_page_end_overlay(pdf_env *penv, visit_env *venv);
-void visit_doc_end_overlay(pdf_env *penv, visit_env *venv);
+void visit_widget_overlay(pdf_env *penv, pdf_widget *widget, int widget_num);
+void visit_page_end_overlay(pdf_env *penv);
+void visit_doc_end_overlay(pdf_env *penv);
 
 #endif

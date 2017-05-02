@@ -20,36 +20,35 @@ static const char *get_type_name(fz_context *ctx, pdf_widget *widget) {
 
 void parse_fields_doc(pdf_env *env) {
     visit_funcs vfuncs = get_visitor_funcs(env->cmd);
-    visit_env visenv = {0};
 
     fz_try(env->ctx) {
         if(vfuncs.pre_visit_doc)
-            vfuncs.pre_visit_doc(env, &visenv);
+            vfuncs.pre_visit_doc(env);
 
         for(int i = 0; i < env->page_count; i++) {
             env->page_num = i;
             env->page = pdf_load_page(env->ctx, env->doc, env->page_num);
 
             if(vfuncs.pre_visit_page)
-                vfuncs.pre_visit_page(env, &visenv);
+                vfuncs.pre_visit_page(env);
 
             pdf_widget *widget = pdf_first_widget(env->ctx, env->doc, env->page);
             int wid_count = 0;
 
             while(widget) {
                 if(vfuncs.visit_widget)
-                    vfuncs.visit_widget(env, &visenv, widget, wid_count);
+                    vfuncs.visit_widget(env, widget, wid_count);
 
                 widget = pdf_next_widget(env->ctx, widget);
                 wid_count++;
             }
 
             if(vfuncs.post_visit_page)
-                vfuncs.post_visit_page(env, &visenv);
+                vfuncs.post_visit_page(env);
         }
 
         if(vfuncs.post_visit_doc)
-            vfuncs.post_visit_doc(env, &visenv);
+            vfuncs.post_visit_doc(env);
 
     } fz_catch(env->ctx) {
         fprintf(stderr, "cannot get pages: %s\n", fz_caught_message(env->ctx));
@@ -82,19 +81,20 @@ visit_funcs get_visitor_funcs(int cmd) {
 }
 
 
-void visit_doc_init_json(pdf_env *env, visit_env *visenv) {
-    visenv->json_root = json_object();
+void visit_doc_init_json(pdf_env *env) {
+    env->parse.json_root = json_object();
 }
 
 
-void visit_doc_end_json(pdf_env *env, visit_env *visenv) {
+void visit_doc_end_json(pdf_env *env) {
     if(env->files.output) {
-        json_dump_file(visenv->json_root, env->files.output, JSON_INDENT(2));
+        fprintf(stderr, "Saving json for '%s' command to '%s'\n", command_name(env->cmd), env->files.output);
+        json_dump_file(env->parse.json_root, env->files.output, JSON_INDENT(2));
     } else {
-        json_dumpf(visenv->json_root, stdout, JSON_INDENT(2));
+        json_dumpf(env->parse.json_root, stdout, JSON_INDENT(2));
     }
 
-    json_decref(visenv->json_root);
+    json_decref(env->parse.json_root);
 }
 
 
@@ -116,7 +116,7 @@ json_t *build_font_json(fz_context *ctx, pdf_obj *font_dict) {
     return font;
 }
 
-void visit_page_fontlist(pdf_env *env, visit_env *visenv) {
+void visit_page_fontlist(pdf_env *env) {
     pdf_obj *dict = pdf_page_resources(env->ctx, env->page);
 
     if(!pdf_is_dict(env->ctx, dict))
@@ -127,12 +127,12 @@ void visit_page_fontlist(pdf_env *env, visit_env *visenv) {
     if(dlen <= 0)
         return;
 
-    if(!json_object_get(visenv->json_root, "page_fonts")) {
-        json_object_set_new(visenv->json_root, "page_fonts", json_object());
-        json_object_set_new(visenv->json_root, "widget_fonts", json_object());
+    if(!json_object_get(env->parse.json_root, "page_fonts")) {
+        json_object_set_new(env->parse.json_root, "page_fonts", json_object());
+        json_object_set_new(env->parse.json_root, "widget_fonts", json_object());
     }
 
-    json_t *pg_res_fonts = json_object_get(visenv->json_root, "page_fonts");
+    json_t *pg_res_fonts = json_object_get(env->parse.json_root, "page_fonts");
 
     for(int i = 0; i < dlen; i++) {
         pdf_obj *key = pdf_dict_get_key(env->ctx, dict, i);
@@ -167,7 +167,7 @@ void visit_page_fontlist(pdf_env *env, visit_env *visenv) {
     }
 }
 
-void visit_widget_fontlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, int widget_num) {
+void visit_widget_fontlist(pdf_env *env, pdf_widget *widget, int widget_num) {
     pdf_obj *obj = ((pdf_annot *) widget)->obj;
 
     pdf_obj *ap = pdf_dict_get(env->ctx, obj, PDF_NAME_AP); //(AP)pearance dictionary
@@ -188,7 +188,7 @@ void visit_widget_fontlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, 
     int fonts_len = pdf_dict_len(env->ctx, fonts);
     if(fonts_len == 0) return;
 
-    json_t *widget_fonts = json_object_get(visenv->json_root, "widget_fonts");
+    json_t *widget_fonts = json_object_get(env->parse.json_root, "widget_fonts");
 
     for(int i = 0; i < fonts_len; i++) {
         pdf_obj *key = pdf_dict_get_key(env->ctx, fonts, i);
@@ -202,18 +202,18 @@ void visit_widget_fontlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, 
 }
 
 
-void visit_page_init_json(pdf_env *env, visit_env *visenv) {
-    visenv->json_item = json_array();
+void visit_page_init_json(pdf_env *env) {
+    env->parse.json_item = json_array();
 }
 
 
-void visit_page_end_json(pdf_env *env, visit_env *visenv) {
-    if(!json_is_array(visenv->json_item) || json_array_size(visenv->json_item) == 0)
+void visit_page_end_json(pdf_env *env) {
+    if(!json_is_array(env->parse.json_item) || json_array_size(env->parse.json_item) == 0)
         return;
 
     char buf[10];
     snprintf(buf, 10, "%d", env->page_num);
-    json_object_set(visenv->json_root, buf, visenv->json_item);
+    json_object_set(env->parse.json_root, buf, env->parse.json_item);
 }
 
 
@@ -232,15 +232,15 @@ json_t *visit_field_json_shared(fz_context *ctx, pdf_document *doc, pdf_widget *
 }
 
 
-void visit_widget_jsonmap(pdf_env *env, visit_env *visenv, pdf_widget *widget, int widget_num) {
+void visit_widget_jsonmap(pdf_env *env, pdf_widget *widget, int widget_num) {
     json_t *obj = visit_field_json_shared(env->ctx, env->doc, widget);
 
     json_object_set_new(obj, "key", json_string(""));
-    json_array_append_new(visenv->json_item, obj);
+    json_array_append_new(env->parse.json_item, obj);
 }
 
 
-void visit_field_jsonlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, int widget_num) {
+void visit_field_jsonlist(pdf_env *env, pdf_widget *widget, int widget_num) {
     json_t *jsobj = visit_field_json_shared(env->ctx, env->doc, widget);
 
     json_object_set_new(jsobj, "type", json_string(get_type_name(env->ctx, widget)));
@@ -262,12 +262,12 @@ void visit_field_jsonlist(pdf_env *env, visit_env *visenv, pdf_widget *widget, i
 
     json_object_set_new(jsobj, "rect", bounds);
 
-    json_array_append_new(visenv->json_item, jsobj);
+    json_array_append_new(env->parse.json_item, jsobj);
 }
 
 
 
-void visit_widget_overlay(pdf_env *env, visit_env *visenv, pdf_widget *widget, int widget_num) {
+void visit_widget_overlay(pdf_env *env, pdf_widget *widget, int widget_num) {
     fz_rect rect;
     pdf_annot *overlay = pdf_create_annot(env->ctx, env->page, pdf_annot_type_from_string("FreeText"));
     pdf_bound_widget(env->ctx, widget, &rect);
@@ -283,31 +283,29 @@ void visit_widget_overlay(pdf_env *env, visit_env *visenv, pdf_widget *widget, i
 }
 
 
-void visit_page_end_overlay(pdf_env *env, visit_env *visenv) {
+void visit_page_end_overlay(pdf_env *env) {
     pdf_update_page(env->ctx, env->page);
 }
 
 
-void visit_doc_end_overlay(pdf_env *env, visit_env *visenv) {
+void visit_doc_end_overlay(pdf_env *env) {
     pdf_write_options opts = {0};
     opts.do_incremental = 0;
     char *output_file;
     char buf[256];
     int len;
 
-    printf("SAVE PDF\n");
     if(env->files.output) {
         output_file = env->files.output;
     } else {
-        printf("MAKE FILE\n");
         len = strlen(env->files.input);
         len = (len < 240) ? len - 4 : 240;
 
         memcpy(buf, env->files.input, len);
         memcpy(buf+len, "_annotated.pdf", 15);
         output_file = buf;
-        printf("MAKE FILE: %s\n", buf);
     }
 
+    fprintf(stderr, "Writing annoted pdf to %s\n", output_file);
     pdf_save_document(env->ctx, env->doc, output_file, &opts);
 }

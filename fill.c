@@ -8,13 +8,12 @@
 
 extern fz_document_handler pdf_document_handler;
 
-#define CMD_COUNT 5
-
 const char *command_names[CMD_COUNT] = {
     "annot", "info", "template", "fonts", "complete"
 };
 
-static void usage_message(int cmd) {
+
+void usage_message(int cmd) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "  fillpdf <command> [options] input.pdf [output]\n");
     fprintf(stderr, "\n");
@@ -25,7 +24,7 @@ static void usage_message(int cmd) {
 
     if(cmd != COMPLETE_PDF) {
         fprintf(stderr, "  fillpdf annot input.pdf [output.pdf]\n");
-        fprintf(stderr, "      [output.pdf] defau;ts to the input filename suffixed with '_annotated.pdf'.\n");
+        fprintf(stderr, "      [output.pdf] defaults to the input filename suffixed with '_annotated.pdf'.\n");
         fprintf(stderr, "\n");
         fprintf(stderr, "  fillpdf info input.pdf [info.json]\n");
         fprintf(stderr, "  fillpdf template input.pdf [template.json]\n");
@@ -56,7 +55,7 @@ static void usage_message(int cmd) {
 }
 
 
-static int read_info_cmd_args(int argc, char **argv, pdf_env *env) {
+int read_info_cmd_args(int argc, char **argv, pdf_env *env) {
     env->files.input = argv[2];
 
     if(argc == 4) {
@@ -66,7 +65,7 @@ static int read_info_cmd_args(int argc, char **argv, pdf_env *env) {
     return 1;
 }
 
-static int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
+int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
     int arg;
 
     argc--;
@@ -109,8 +108,9 @@ static int read_completion_cmd_args(int argc, char **argv, pdf_env *env) {
 }
 
 
-static command get_command(char *cmd) {
+command get_command(char *cmd) {
     int i;
+
     for(i=0; i<CMD_COUNT; i++) {
         if(strncmp(command_names[i], cmd, strlen(command_names[i])) == 0)
             return i;
@@ -121,42 +121,46 @@ static command get_command(char *cmd) {
     return -1;
 }
 
-static int read_args(int argc, char **argv, pdf_env *env) {
+const char *command_name(command cmd) {
+    if(cmd >= 0 && cmd < CMD_COUNT) {
+        return command_names[cmd];
+    } else {
+        return NULL;
+    }
+}
+
+int read_args(int argc, char **argv, pdf_env *env) {
     if(argc == 1) {
         fprintf(stderr, "Error: No sub-command, or input file, given.\n\n");
-        usage_message(-1);
         return 0;
     }
 
     env->cmd = get_command(argv[1]);
 
-    if (argc == 2) {
+    if(env->cmd == -1) {
+        fprintf(stderr, "Error: '%s' is not a recognised command.\n\n", argv[1]);
+        return 0;
+    } else if (argc == 2) {
         fprintf(stderr, "Error: No input file given.\n\n");
-        usage_message(env->cmd);
         return 0;
     }
 
-    switch(env->cmd) {
-        case -1:
-            return 0;
-
-        case COMPLETE_PDF:
-            return read_completion_cmd_args(argc, argv, env);;
-
-        default:
-            return read_info_cmd_args(argc, argv, env);
+    if(env->cmd == COMPLETE_PDF) {
+        return read_completion_cmd_args(argc, argv, env);;
+    } else {
+        return read_info_cmd_args(argc, argv, env);
     }
 }
 
 int main(int argc, char **argv) {
     const char *command;
     int caught_err = 0;
-    int retval;
+    int retval = EXIT_SUCCESS;
 
     pdf_env *env = malloc(sizeof(pdf_env));
     memset(env, 0, sizeof(pdf_env));
 
-    if(!(retval = read_args(argc, argv, env))) {
+    if(!read_args(argc, argv, env)) {
         usage_message(env->cmd);
         retval = EXIT_FAILURE;
         goto main_exit;
@@ -164,7 +168,7 @@ int main(int argc, char **argv) {
 
     env->ctx = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
 
-    if (!env->ctx)	{
+    if (!env->ctx) {
         fprintf(stderr, "cannot create mupdf context\n");
         retval = EXIT_FAILURE;
         goto main_exit;
@@ -173,7 +177,7 @@ int main(int argc, char **argv) {
     /* Only handle pdf. */
     fz_try(env->ctx) {
         fz_register_document_handler(env->ctx, &pdf_document_handler);
-    } fz_catch(env->ctx)	{
+    } fz_catch(env->ctx) {
         fprintf(stderr, "cannot register document handlers: %s\n", fz_caught_message(env->ctx));
         retval = EXIT_FAILURE;
     }
@@ -181,6 +185,7 @@ int main(int argc, char **argv) {
     if(retval == EXIT_FAILURE) goto main_exit_ctxt;
 
     /* Open the document. */
+    fz_var(retval);
     fz_try(env->ctx) {
         env->doc = pdf_open_document(env->ctx, env->files.input);
     } fz_catch(env->ctx)	{
@@ -188,9 +193,10 @@ int main(int argc, char **argv) {
         retval = EXIT_FAILURE;
     }
 
-    if(retval = EXIT_FAILURE) goto main_exit_ctxt;
+    if(retval == EXIT_FAILURE) goto main_exit_ctxt;
 
     /* Count the number of pages. */
+    fz_var(retval);
     fz_try(env->ctx) {
         env->page_count = pdf_count_pages(env->ctx, env->doc);
     } fz_catch(env->ctx)	{
@@ -198,7 +204,7 @@ int main(int argc, char **argv) {
         retval = EXIT_FAILURE;
     }
 
-    if(retval = EXIT_FAILURE) goto main_exit_doc;
+    if(retval == EXIT_FAILURE) goto main_exit_doc;
 
     if(env->cmd == COMPLETE_PDF) {
         cmplt_fill_all(env);
