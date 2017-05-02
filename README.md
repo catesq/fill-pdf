@@ -1,6 +1,6 @@
 # Overview
 
-Work in progress.
+Work in progress. Intermittent bug in document signing, sometimes the pdf created has invalid xref. Current workaround is two step form filling process. First step is `fillpdf complete -d data.json -t template.json input.pdf filled.pdf` followed by a separate signature `fillpdf complete -s sig_data.json -t template.json filled.pdf signed.pdf`. If I can't find a way to form fill and sign in one step I'll either make the signing step a separate command or make the two steps look like one by doing them behind the scenes and deleting filled.pdf.
 
 # Dependencies
 
