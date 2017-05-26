@@ -3,8 +3,10 @@
 #include <jansson.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include "fill.h"
+#include "zlib.h"
 
 void cmplt_fill_all(pdf_env *env) {
     json_error_t json_err;
@@ -72,17 +74,15 @@ void cmplt_fill_all(pdf_env *env) {
         updated_doc += updated_pg;
     }
 
-    if(updated_doc)
+    if(updated_doc) {
         pdf_finish_edit(env->ctx, env->doc);
 
-//    cmplt_fcopy(env->files.input, env->files.output);
-
-//    if(updated_doc) {
         pdf_write_options opts = {0};
         opts.do_incremental = 0;
 
         pdf_save_document(env->ctx, env->doc, env->files.output, &opts);
-//    }
+    }
+
 
     if(env->add_sig) {
         cmplt_sign_and_save(env);
@@ -152,11 +152,13 @@ int cmplt_fill_field(pdf_env *env) {
             break;
 
         case ADD_SIGNATURE:
-            // signing the document during the same pass as a filling the form was problematic
-            // it works best when filling form, saving a temp pdf, the signing the temp pdf.
-            // so delay signing until all fields done in cmplt_fill_all and do a second incremental save
+            // delay signing until all fields complete in cmplt_fill_all, then save, reload, sign, resave
             env->add_sig = 1;
             memcpy(&env->add_sig_data, &env->fill.sig, sizeof(signature_data));
+            break;
+
+        case ADD_IMAGE:
+            updated = cmplt_add_image(env);
             break;
 
         default:
@@ -184,6 +186,104 @@ void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field
     int ffval = pdf_to_int(ctx, pdf_dict_get(ctx, field, PDF_NAME_Ff));
     pdf_obj *ffobj = pdf_new_int(ctx, doc, ffval | Ff_ReadOnly);
     pdf_dict_put_drop(ctx, field, PDF_NAME_Ff, ffobj);
+}
+
+
+
+int cmplt_add_image(pdf_env *env) {
+    // adapted from https://github.com/rk700/PyMuPDF/blob/master/fitz/fitz_wrap.c fz_page_s_insertImage
+    char X[15], Y[15], W[15], H[15], size_str[15], xref_str[15], name[50];
+    const char *template = " q %s 0 0 %s %s %s cm /%s Do Q \n";
+    const char *name_templ = "Image%s-%s-%s-%s";
+    fz_buffer *res = NULL;
+    fz_buffer *nres = NULL;
+    pdf_obj *resources, *subres, *contents, *ref;
+    fz_image *img;
+    size_t c_len;
+    unsigned char *content_str;
+    image_data *imgdata = &env->fill.img;
+    struct fz_rect_s prect, rect = {imgdata->pos.left, imgdata->pos.top, imgdata->pos.right, imgdata->pos.bottom};
+//    fz_bound_page(env->doc, env->page, &prect);
+
+    fz_try(env->ctx) {
+        contents = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Contents);
+        resources = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Resources);
+        subres = pdf_dict_get(env->ctx, resources, PDF_NAME_XObject);
+        if (!subres) {  // has no XObject yet
+            subres = pdf_new_dict(env->ctx, env->doc, 10);
+            pdf_dict_put_drop(env->ctx, resources, PDF_NAME_XObject, subres);
+        }
+        img = fz_new_image_from_file(env->ctx, imgdata->file_name);
+        ref = u_pdf_add_image(env->ctx, env->doc, img, 0);
+
+        if(rect.x1 == 0) {
+            rect.x1 = img->w;
+        }
+
+        if(rect.y1 == 0) {
+            rect.y1 = img->h;
+        }
+
+        snprintf(X, 15, "%g", (double) rect.x0);
+        snprintf(Y, 15, "%g", (double) rect.y0);
+        snprintf(W, 15, "%g", (double) rect.x1);
+        snprintf(H, 15, "%g", (double) rect.y1);
+
+        snprintf(size_str, 15, "%i", (int) fz_image_size(env->ctx, img));
+        snprintf(xref_str, 15, "%i", (int) pdf_to_num(env->ctx, env->page->obj));
+        snprintf(name, 50, name_templ, size_str, xref_str, X, Y);
+        pdf_dict_puts(env->ctx, subres, name, ref);
+        // retrieve and update contents stream
+        if (pdf_is_array(env->ctx, contents)) {            // take last if more than one contents object
+            int i = pdf_array_len(env->ctx, contents) - 1;
+            contents = pdf_array_get(env->ctx, contents, i);
+        }
+
+        res = pdf_load_stream(env->ctx, contents);
+        if (!res)
+            fz_throw(env->ctx, FZ_ERROR_GENERIC, "bad PDF: Contents is no stream object");
+
+        fz_buffer_printf(env->ctx, res, template, W, H, X, Y, name);
+        fz_write_buffer_byte(env->ctx, res, 0);
+        pdf_dict_put(env->ctx, contents, PDF_NAME_Filter, PDF_NAME_FlateDecode);
+        c_len = fz_buffer_storage(env->ctx, res, &content_str);
+        nres = cmplt_deflatebuf(env->ctx, content_str, (size_t) c_len);
+        pdf_update_stream(env->ctx, env->doc, contents, nres, 1);
+
+    } fz_always(env->ctx) {
+        if (img) fz_drop_image(env->ctx, img);
+        if (res) fz_drop_buffer(env->ctx, res);
+        if (nres) fz_drop_buffer(env->ctx, nres);
+    } fz_catch(env->ctx) {
+        return 0;
+    }
+
+    return 1;
+}
+
+fz_buffer *cmplt_deflatebuf(fz_context *ctx, unsigned char *p, size_t n) {
+    fz_buffer *buf;
+    unsigned long csize;
+    int t;
+    unsigned long longN = (unsigned long)n;
+    unsigned char *data;
+    size_t cap;
+
+    if (n != (size_t)longN)
+        fz_throw(ctx, FZ_ERROR_GENERIC, "Buffer to large to deflate");
+
+    cap = compressBound(longN);
+    data = fz_malloc(ctx, cap);
+    buf = fz_new_buffer_from_data(ctx, data, cap);
+    csize = (uLongf)cap;
+    t = compress(data, &csize, p, longN);
+    if (t != Z_OK)
+    {
+        fz_drop_buffer(ctx, buf);
+        fz_throw(ctx, FZ_ERROR_GENERIC, "cannot deflate buffer");
+    }
+    fz_resize_buffer(ctx, buf, csize);
+    return buf;
 }
 
 

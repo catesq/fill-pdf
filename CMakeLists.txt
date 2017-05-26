@@ -22,7 +22,7 @@ PROJECT(fillpdf)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/mupdf/include)
 
-ADD_EXECUTABLE(fillpdf fill_cli.c map_input.c parse.c complete.c)
+ADD_EXECUTABLE(fillpdf fill_cli.c map_input.c parse.c util.c complete.c)
 ADD_DEPENDENCIES(fillpdf mupdf)
 
 SET(MUPDF_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/mupdf/build/${MUPDF_BUILD}")

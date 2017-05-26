@@ -10,20 +10,22 @@ double map_input_number(json_t *jsn_obj, const char *property, float default_val
     }
 }
 
-void map_input_posdata(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height) {
-    pos->left = map_input_number(jsn_obj, "left", default_xy, 0);
-    pos->top = map_input_number(jsn_obj, "top", default_xy, 0);
-    pos->right = pos->left + map_input_number(jsn_obj, "width", default_width, 1);
-    pos->bottom = pos->top + map_input_number(jsn_obj, "height", default_height, 1);
-}
-
-
 fill_type map_input_signature(pdf_env *env) {
     const char *sigfile = NULL;
-    json_t *json_sigfile = NULL, *json_font = NULL, *json_pwd;
+    json_t *json_sigfile = NULL, *json_font = NULL, *json_pwd, *json_pos;
     struct stat buffer;
+    pos_data *pos = &env->fill.sig.pos;
 
-    map_input_posdata(json_object_get(env->fill.json_map_item, "rect"), &env->fill.sig.pos, 0, DEFAULT_SIG_WIDTH, DEFAULT_SIG_HEIGHT);
+    json_pos = json_object_get(env->fill.json_map_item, "rect");
+
+    if(!json_is_object(json_pos)) {
+        RETURN_FILL_ERROR("Rect for signature not set");
+    }
+
+    pos->left = map_input_number(json_pos, "left", 0, 0);
+    pos->top = map_input_number(json_pos, "top", 0, 0);
+    pos->right = pos->left + map_input_number(json_pos, "width", DEFAULT_SIG_WIDTH, 1);
+    pos->bottom = pos->top + map_input_number(json_pos, "height", DEFAULT_SIG_HEIGHT, 1);
 
     env->fill.sig.widget_name = env->fill.input_key;
     env->fill.sig.page_num = env->page_num;
@@ -66,7 +68,13 @@ fill_type map_input_signature(pdf_env *env) {
 
 
 fill_type map_input_textfield(pdf_env *env, fill_type success_type) {
-    map_input_posdata(json_object_get(env->fill.json_map_item, "rect"), &env->fill.text.pos, -1, DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
+    pos_data *pos = &env->fill.text.pos;
+    json_t *json_pos = json_object_get(env->fill.json_map_item, "rect");
+
+    pos->left = map_input_number(json_pos, "left", 0, 0);
+    pos->top = map_input_number(json_pos, "top", 0, 0);
+    pos->right = pos->left + map_input_number(json_pos, "width", DEFAULT_TEXT_WIDTH, 1);
+    pos->bottom = pos->top + map_input_number(json_pos, "height", DEFAULT_TEXT_HEIGHT, 1);
 
     if(env->fill.text.pos.left < 0 || env->fill.text.pos.top < 0) {
         RETURN_FILL_ERROR("Position invalid");
@@ -100,6 +108,29 @@ fill_type map_input_textfield(pdf_env *env, fill_type success_type) {
     return success_type;
 }
 
+fill_type map_input_image(pdf_env *env) {
+    pos_data *pos = &env->fill.img.pos;
+    json_t *json_pos;
+
+    if((json_pos = json_object_get(env->fill.json_map_item, "rect")) != NULL) {
+        pos->left = map_input_number(json_pos, "left", 0, 0);
+        pos->top = map_input_number(json_pos, "top", 0, 0);
+        pos->right = map_input_number(json_pos, "width", 0, 0);
+        pos->bottom = map_input_number(json_pos, "height", 0, 0);
+    } else if((json_pos = json_object_get(env->fill.json_map_item, "pos")) != NULL) {
+        pos->left = map_input_number(json_pos, "left", 0, 0);
+        pos->top = map_input_number(json_pos, "top", 0, 0);
+        pos->right = 0;
+        pos->bottom = 0;
+    } else {
+        RETURN_FILL_ERROR("Image position not set");
+    }
+
+    json_t *json_fname = json_object_get(env->fill.json_map_item, "src");
+    env->fill.img.file_name = json_string_value(json_fname);
+
+    return ADD_IMAGE;
+}
 
 fill_type map_input_data(pdf_env *env) {
     json_t *json_id = json_object_get(env->fill.json_map_item, "id");
@@ -134,6 +165,12 @@ fill_type map_input_data(pdf_env *env) {
         return map_input_textfield(env, ADD_TEXTFIELD);
     } else if(strncmp(type_name, "signature", 9) == 0) {
         return map_input_signature(env);
+    } else if(strncmp(type_name, "text", 5) == 0) {
+        RETURN_FILL_ERROR("Text overlay not yet supported");
+    } else if(strncmp(type_name, "image", 6) == 0) {
+        return map_input_image(env);
+    } else if(strncmp(type_name, "signature_logo", 6) == 0) {
+        RETURN_FILL_ERROR("Logo signature not yet supported");
     } else {
         RETURN_FILL_ERROR("Trying to add an unrecognised type. Only 'textfield' and 'signature' supported.");
     }

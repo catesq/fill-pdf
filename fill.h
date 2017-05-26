@@ -5,7 +5,7 @@
 #include <mupdf/pdf.h>
 #include <jansson.h>
 
-typedef enum {FILL_DATA_INVALID, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_SIGNATURE} fill_type;
+typedef enum {FILL_DATA_INVALID, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_SIGNATURE, ADD_IMAGE} fill_type;
 
 typedef enum {ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} command;
 
@@ -46,6 +46,7 @@ typedef struct {
     float bottom;
 } pos_data;
 
+
 typedef struct {
     pos_data pos;
     const char *widget_name;
@@ -55,6 +56,12 @@ typedef struct {
     int visible;
     int page_num;
 } signature_data;
+
+
+typedef struct {
+    pos_data pos;
+    const char *file_name;
+} image_data;
 
 
 typedef struct {
@@ -69,6 +76,7 @@ typedef struct {
     char *input;
     char *output;
 } files_env;
+
 
 typedef struct {
     files_env files;
@@ -88,6 +96,7 @@ typedef struct {
         const char *field_name;
         text_data text;
         signature_data sig;
+        image_data img;
     };
 } _fill_env;
 
@@ -155,12 +164,15 @@ void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field
 int cmplt_fcopy(const char *src, const char *dest);
 static int cmplt_sign_and_save(pdf_env *env);
 
+int cmplt_add_image(pdf_env *env);
 int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, signature_data *sig);
 int cmplt_add_textfield(pdf_env *env);
 int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data);
 pdf_widget *cmplt_find_widget_name(fz_context *ctx, pdf_page *page, const char *field_name);
 pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id);
 int str_is_all_digits(const char *str);
+fz_buffer *cmplt_deflatebuf(fz_context *ctx, unsigned char *p, size_t n);
+
 
 //map_input.c
 double map_input_number(json_t *jsn_obj, const char *property, float default_val, float min_val);
@@ -168,6 +180,7 @@ void map_input_posdata(json_t *jsn_obj, pos_data *pos, float default_xy, float d
 fill_type map_input_signature(pdf_env *env);
 fill_type map_input_textfield(pdf_env *env, fill_type success_type);
 fill_type map_input_data(pdf_env *env);
+fill_type map_input_image(pdf_env *env);
 
 //parse.c
 visit_funcs get_visitor_funcs(int cmd);
@@ -189,5 +202,12 @@ json_t *visit_field_json_shared(fz_context *ctx, pdf_document *doc, pdf_widget *
 void visit_widget_overlay(pdf_env *penv, pdf_widget *widget, int widget_num);
 void visit_page_end_overlay(pdf_env *penv);
 void visit_doc_end_overlay(pdf_env *penv);
+
+//util.c
+
+pdf_obj *u_pdf_add_image(fz_context *ctx, pdf_document *doc, fz_image *image, int mask);
+pdf_obj *u_pdf_find_image_resource(fz_context *ctx, pdf_document *doc, fz_image *item, unsigned char digest[16]);
+void u_pdf_preload_image_resources(fz_context *ctx, pdf_document *doc);
+void u_fz_md5_image(fz_context *ctx, fz_image *image, unsigned char digest[16]);
 
 #endif
