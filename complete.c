@@ -202,8 +202,10 @@ int cmplt_add_image(pdf_env *env) {
     size_t c_len;
     unsigned char *content_str;
     image_data *imgdata = &env->fill.img;
-    struct fz_rect_s prect, rect = {imgdata->pos.left, imgdata->pos.top, imgdata->pos.right, imgdata->pos.bottom};
-//    fz_bound_page(env->doc, env->page, &prect);
+    struct fz_rect_s pgrect, rect = {imgdata->pos.left, imgdata->pos.top, imgdata->pos.right, imgdata->pos.bottom};
+    pdf_bound_page(env->ctx, env->page, &pgrect);
+
+    rect.y0 = pgrect.y1 - rect.y0;
 
     fz_try(env->ctx) {
         contents = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Contents);
@@ -217,11 +219,12 @@ int cmplt_add_image(pdf_env *env) {
         ref = u_pdf_add_image(env->ctx, env->doc, img, 0);
 
         if(rect.x1 == 0) {
-            rect.x1 = img->w;
+            // use orig img width if requesed width & height == 0, if width == 0 and height !=0 scale width to same proportion as height
+            rect.x1 = (rect.y1 == 0) ? img->w : img->w * rect.y1 / img->h;
         }
 
         if(rect.y1 == 0) {
-            rect.y1 = img->h;
+            rect.y1 = (imgdata->pos.right == 0) ? img->h : img->h * rect.x1 / img->w;
         }
 
         snprintf(X, 15, "%g", (double) rect.x0);
