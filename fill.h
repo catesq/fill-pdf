@@ -15,8 +15,8 @@ const char *command_names[CMD_COUNT];
 extern fz_document_handler pdf_document_handler;
 
 
-#define DEFAULT_SIG_WIDTH 100
-#define DEFAULT_SIG_HEIGHT 100
+#define DEFAULT_SIG_WIDTH 30
+#define DEFAULT_SIG_HEIGHT 30
 
 #define DEFAULT_TEXT_WIDTH 140
 #define DEFAULT_TEXT_HEIGHT 14
@@ -38,6 +38,81 @@ extern fz_document_handler pdf_document_handler;
     return FILL_DATA_INVALID; \
 }
 
+#define INIT_CAP 8
+
+
+// vg = vector graphics. a simple wrapper of mupdf's internal vg drawing api
+
+typedef enum { VG_STROKE, VG_FILL } vg_path_type;
+typedef enum { VG_MOVE, VG_LINE, VG_HORIZ, VG_VERT, VG_CURVE, VG_CLOSE } vg_cmd_type;
+
+typedef struct _vg_coord {
+    float val;
+} vg_coord;
+
+typedef struct _vg_pt {
+    float x, y;
+} vg_pt;
+
+typedef struct _vg_curve {
+    vg_pt pt1, pt2, pt3;
+} vg_curve;
+
+//typedef struct _vg_cmd_data {
+//    union {
+//        vg_coord p;
+//        vg_pt pt;
+//        vg_curve curve;
+//    };
+//} vg_cmd_data;
+
+typedef struct _vg_cmd {
+    vg_cmd_type type;
+
+    union {
+        vg_pt pt;
+        vg_curve curve;
+        float data;
+    };
+} vg_cmd;
+
+
+typedef struct _vg_list {
+    int len;
+    int cap;
+    int sizeof_item;
+    void **items;
+} vg_list;
+
+typedef struct _vg_stroke {
+
+} vg_stroke;
+
+typedef struct _vg_path {
+    vg_path_type type;
+    union {
+        float rgba[4];
+        struct {
+            float r,g,b,a;
+        };
+    };
+    vg_list *cmds;
+
+    union {
+        fz_stroke_state stroke;
+    };
+
+} vg_path;
+
+typedef vg_list vg_pathlist;
+
+
+typedef struct _vg_fz_pathlist {
+    fz_context *ctx;
+    vg_list *paths;
+} vg_fz_pathlist;
+
+// these structures hold data from the json template file
 
 typedef struct {
     float left;
@@ -77,6 +152,7 @@ typedef struct {
     char *output;
 } files_env;
 
+// used by in complete.c for the cli complete command
 
 typedef struct {
     files_env files;
@@ -101,12 +177,13 @@ typedef struct {
 } _fill_env;
 
 
-
+// used in visit.c for info parser cmds
 typedef struct  {
     files_env files;
     json_t *json_root;
     json_t *json_item;
 } _visit_env;
+
 
 
 typedef struct {
@@ -131,12 +208,13 @@ typedef struct {
 } pdf_env;
 
 
+// used by info parsers. one parser get widget info, the other font info, the other general pdf info.
+// the pdf page parsing method is the same for each so parsed different output funcs
 typedef void (*pre_visit_doc_func)(pdf_env *);
 typedef void (*pre_visit_page_func)(pdf_env *);
 typedef void (*visit_widget_func)(pdf_env *, pdf_widget *w, int widget_num);
 typedef void (*post_visit_page_func)(pdf_env *);
 typedef void (*post_visit_doc_func)(pdf_env *);
-
 
 typedef struct {
     pre_visit_doc_func pre_visit_doc;
@@ -209,5 +287,33 @@ pdf_obj *u_pdf_add_image(fz_context *ctx, pdf_document *doc, fz_image *image, in
 pdf_obj *u_pdf_find_image_resource(fz_context *ctx, pdf_document *doc, fz_image *item, unsigned char digest[16]);
 void u_pdf_preload_image_resources(fz_context *ctx, pdf_document *doc);
 void u_fz_md5_image(fz_context *ctx, fz_image *image, unsigned char digest[16]);
+void u_pdf_sign_signature(fz_context *ctx, pdf_document *doc, pdf_widget *widget, const char *sigfile, const char *password, vg_pathlist *pathlist, const char *overlay_msg);
+void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_annot *annot, vg_pathlist *pathlist, const char *msg_1);
+
+//vg_path.c
+
+vg_path *vg_new_path(vg_path_type type, float rgba[4]);
+vg_cmd *vg_add_cmd(vg_path *path, vg_cmd *cmd);
+
+vg_cmd *vg_horizto(float);
+vg_cmd *vg_vertto(float);
+vg_cmd *vg_moveto(float, float);
+vg_cmd *vg_lineto(float, float);
+vg_cmd *vg_curveto(float, float, float, float, float, float);
+vg_cmd *vg_close();
+
+
+vg_cmd *vg_get_cmd(vg_path *path, int idx);
+void vg_free_path(vg_path *path);
+
+vg_pathlist *vg_new_pathlist();
+vg_path *vg_add_path(vg_pathlist *pathlist, vg_path *path);
+vg_path *vg_get_path(vg_pathlist *pathlist, int idx);
+void vg_free_pathlist(vg_pathlist *pathlist);
+
+void vg_drop_fz_paths(vg_fz_pathlist *);
+
+vg_fz_pathlist *vg_draw_pathlist(fz_context *ctx, fz_device *dev, fz_rect *rect, fz_matrix *page_ctm, vg_pathlist *pathlist);
+
 
 #endif

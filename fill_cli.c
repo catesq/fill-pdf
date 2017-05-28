@@ -197,23 +197,23 @@ int main(int argc, char **argv) {
     fz_try(env->ctx) {
         env->page_count = pdf_count_pages(env->ctx, env->doc);
     } fz_catch(env->ctx)	{
+        pdf_drop_document(env->ctx, env->doc);
         fprintf(stderr, "cannot count number of pages: %s\n", fz_caught_message(env->ctx));
         retval = EXIT_FAILURE;
     }
 
-    if(retval == EXIT_FAILURE) goto main_exit_doc;
+    if(retval == EXIT_FAILURE) goto main_exit_ctxt;
 
     if(env->cmd == COMPLETE_PDF) {
         cmplt_fill_all(env);
     } else {
         parse_fields_doc(env);
+        pdf_drop_document(env->ctx, env->doc);
     }
 
-main_exit_doc:
-    pdf_drop_document(env->ctx, env->doc);
+
 main_exit_ctxt:
     fz_drop_context(env->ctx);
-
 main_exit:
     return retval;
 }

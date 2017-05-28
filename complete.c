@@ -42,50 +42,58 @@ void cmplt_fill_all(pdf_env *env) {
         goto tpl_exit;
     }
 
-    const char* obj_idx;
-    int page_idx, item_idx;
-    json_t *page_val, *item_val;
 
-    int updated_doc = 0;
-    json_object_foreach(template, obj_idx, page_val) {
-        // filter pages in the tpl.json.
-        if(!str_is_all_digits(obj_idx) || !json_is_array(page_val))
-            continue;
+    fz_var(json_err);
+    fz_var(data_file);
+    fz_var(data_json);
+    fz_var(template);
+    fz_try(env->ctx) {
+        const char* obj_idx;
+        int page_idx, item_idx;
+        json_t *page_val, *item_val;
 
-        sscanf(obj_idx, "%d", &page_idx);
-        env->page_num = page_idx;
+        int updated_doc = 0;
+        json_object_foreach(template, obj_idx, page_val) {
+            // filter pages in the tpl.json.
+            if(!str_is_all_digits(obj_idx) || !json_is_array(page_val))
+                continue;
 
-        fz_try(env->ctx) {
+            sscanf(obj_idx, "%d", &page_idx);
+            env->page_num = page_idx;
+
             env->page = pdf_load_page(env->ctx, env->doc, page_idx);
-        } fz_catch(env->ctx) {
-            fprintf(stderr, "cannot get pages: %s\n", fz_caught_message(env->ctx));
-            goto data_exit;
+
+            int updated_pg = 0;
+
+            json_array_foreach(page_val, item_idx, env->fill.json_map_item) {
+                updated_pg += cmplt_fill_field(env);
+            }
+
+            if(updated_pg)
+                pdf_update_page(env->ctx, env->page);
+
+            pdf_drop_page(env->ctx, env->page);
+
+            updated_doc += updated_pg;
         }
 
-        int updated_pg = 0;
+        cmplt_fcopy(env->files.input, env->files.output);
 
-        json_array_foreach(page_val, item_idx, env->fill.json_map_item) {
-            updated_pg += cmplt_fill_field(env);
+        if(updated_doc) {
+            pdf_write_options opts = {0};
+            opts.do_incremental = 1;
+            opts.do_compress = 1;
+
+            pdf_save_document(env->ctx, env->doc, env->files.output, &opts);
         }
 
-        if(updated_pg)
-            pdf_update_page(env->ctx, env->page);
+        pdf_drop_document(env->ctx, env->doc);
 
-        updated_doc += updated_pg;
-    }
+        if(env->add_sig) {
+            cmplt_sign_and_save(env);
+        }
+    } fz_catch (env->ctx) {
 
-    if(updated_doc) {
-        pdf_finish_edit(env->ctx, env->doc);
-
-        pdf_write_options opts = {0};
-        opts.do_incremental = 0;
-
-        pdf_save_document(env->ctx, env->doc, env->files.output, &opts);
-    }
-
-
-    if(env->add_sig) {
-        cmplt_sign_and_save(env);
     }
 
 tpl_exit:
@@ -205,7 +213,9 @@ int cmplt_add_image(pdf_env *env) {
     struct fz_rect_s pgrect, rect = {imgdata->pos.left, imgdata->pos.top, imgdata->pos.right, imgdata->pos.bottom};
     pdf_bound_page(env->ctx, env->page, &pgrect);
 
-    rect.y0 = pgrect.y1 - rect.y0;
+    fz_matrix page_ctm;
+    pdf_page_transform(env->ctx, env->page, NULL, &page_ctm);
+    fprintf(stderr, "Matrix (%f, %f, %f, %f, %f, %f)\n", page_ctm.a, page_ctm.b, page_ctm.c, page_ctm.d, page_ctm.e, page_ctm.f);
 
     fz_try(env->ctx) {
         contents = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Contents);
@@ -226,6 +236,8 @@ int cmplt_add_image(pdf_env *env) {
         if(rect.y1 == 0) {
             rect.y1 = (imgdata->pos.right == 0) ? img->h : img->h * rect.x1 / img->w;
         }
+
+        fz_transform_point((fz_point *)(&rect), &page_ctm);
 
         snprintf(X, 15, "%g", (double) rect.x0);
         snprintf(Y, 15, "%g", (double) rect.y0);
@@ -312,17 +324,23 @@ int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, sign
 
     pdf_annot *annot = (pdf_annot*) widget;
 
-    char fn_str[50];
-    if(sig->visible != 0 && cmplt_da_str(sig->font, NULL, fn_str) > 0) {
-        fz_rect *rect = (fz_rect *) &sig->pos;
+    fz_var(widget);
+    fz_var(annot);
+    fz_try(ctx) {
+        char fn_str[50];
+        if(sig->visible != 0 && cmplt_da_str(sig->font, NULL, fn_str) > 0) {
+            fz_rect *rect = (fz_rect *) &sig->pos;
 
-        pdf_set_annot_rect(ctx, annot, rect);
-        pdf_obj *da_pdf = pdf_new_string(ctx, doc, fn_str, strlen(fn_str));
-        pdf_dict_put_drop(ctx, annot->obj, PDF_NAME_DA, da_pdf);
-        pdf_field_set_display(ctx, doc, annot->obj, 0);
+            pdf_set_annot_rect(ctx, annot, rect);
+            pdf_obj *da_pdf = pdf_new_string(ctx, doc, fn_str, strlen(fn_str));
+            pdf_dict_put_drop(ctx, annot->obj, PDF_NAME_DA, da_pdf);
+            pdf_field_set_display(ctx, doc, annot->obj, 0);
+        }
+
+        u_pdf_sign_signature(ctx, doc, widget, sig->file, sig->password, NULL, "hi text");
+    } fz_catch(ctx) {
+
     }
-
-    pdf_sign_signature(ctx, doc, widget, sig->file, sig->password);
 
     return 1;
 }
@@ -446,11 +464,17 @@ static int cmplt_sign_and_save(pdf_env *env) {
 
     if(!retval) goto sig_exit_doc;
 
-    cmplt_add_signature(sig_ctx, sig_doc, sig_page, &env->add_sig_data);
-    pdf_update_page(sig_ctx, sig_page);
-    pdf_write_options sig_opts = {0};
-    sig_opts.do_incremental = 1;
-    pdf_save_document(sig_ctx, sig_doc, env->files.output, &sig_opts);
+    fz_var(sig_doc);
+    fz_var(sig_page);
+    fz_try(sig_ctx) {
+        cmplt_add_signature(sig_ctx, sig_doc, sig_page, &env->add_sig_data);
+        pdf_update_page(env->ctx, sig_page);
+        pdf_write_options sig_opts = {0};
+        sig_opts.do_incremental = 1;
+        pdf_save_document(sig_ctx, sig_doc, env->files.output, &sig_opts);
+    } fz_catch(sig_ctx) {
+
+    }
 
 sig_exit_doc:
     pdf_drop_document(sig_ctx, sig_doc);
