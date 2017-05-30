@@ -215,7 +215,6 @@ int cmplt_add_image(pdf_env *env) {
 
     fz_matrix page_ctm;
     pdf_page_transform(env->ctx, env->page, NULL, &page_ctm);
-    fprintf(stderr, "Matrix (%f, %f, %f, %f, %f, %f)\n", page_ctm.a, page_ctm.b, page_ctm.c, page_ctm.d, page_ctm.e, page_ctm.f);
 
     fz_try(env->ctx) {
         contents = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Contents);
@@ -327,6 +326,7 @@ int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, sign
     fz_var(widget);
     fz_var(annot);
     fz_try(ctx) {
+        vg_pathlist *pathlist = NULL;
         char fn_str[50];
         if(sig->visible != 0 && cmplt_da_str(sig->font, NULL, fn_str) > 0) {
             fz_rect *rect = (fz_rect *) &sig->pos;
@@ -337,7 +337,10 @@ int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, sign
             pdf_field_set_display(ctx, doc, annot->obj, 0);
         }
 
-        u_pdf_sign_signature(ctx, doc, widget, sig->file, sig->password, NULL, "hi text");
+        if(sig->gfx != NULL)
+            pathlist = vg_parse_str(sig->gfx);
+
+        u_pdf_sign_signature(ctx, doc, widget, sig->file, sig->password, pathlist, sig->text);
     } fz_catch(ctx) {
 
     }

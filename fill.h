@@ -45,6 +45,7 @@ extern fz_document_handler pdf_document_handler;
 
 typedef enum { VG_STROKE, VG_FILL } vg_path_type;
 typedef enum { VG_MOVE, VG_LINE, VG_HORIZ, VG_VERT, VG_CURVE, VG_CLOSE } vg_cmd_type;
+typedef enum { VG_PARSE_ERROR, VG_PARSE_CMD, VG_PARSE_PATH } vg_parse_result;
 
 typedef struct _vg_coord {
     float val;
@@ -68,6 +69,7 @@ typedef struct _vg_curve {
 
 typedef struct _vg_cmd {
     vg_cmd_type type;
+    int absolute;
 
     union {
         vg_pt pt;
@@ -128,6 +130,8 @@ typedef struct {
     const char *font;
     const char *file;
     const char *password;
+    const char *text;
+    const char *gfx;
     int visible;
     int page_num;
 } signature_data;
@@ -295,11 +299,11 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
 vg_path *vg_new_path(vg_path_type type, float rgba[4]);
 vg_cmd *vg_add_cmd(vg_path *path, vg_cmd *cmd);
 
-vg_cmd *vg_horizto(float);
-vg_cmd *vg_vertto(float);
-vg_cmd *vg_moveto(float, float);
-vg_cmd *vg_lineto(float, float);
-vg_cmd *vg_curveto(float, float, float, float, float, float);
+vg_cmd *vg_horiz(int abs, float);
+vg_cmd *vg_vert(int abs, float);
+vg_cmd *vg_moveto(int abs, float, float);
+vg_cmd *vg_lineto(int abs, float, float);
+vg_cmd *vg_curveto(int abs, float, float, float, float, float, float);
 vg_cmd *vg_close();
 
 
@@ -313,7 +317,7 @@ void vg_free_pathlist(vg_pathlist *pathlist);
 
 void vg_drop_fz_paths(vg_fz_pathlist *);
 
-vg_fz_pathlist *vg_draw_pathlist(fz_context *ctx, fz_device *dev, fz_rect *rect, fz_matrix *page_ctm, vg_pathlist *pathlist);
-
+vg_pathlist *vg_parse_str(const char *);
+void vg_draw_pathlist(fz_context *ctx, fz_device *dev, fz_rect *rect, fz_matrix *page_ctm, vg_pathlist *pathlist);
 
 #endif

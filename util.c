@@ -276,8 +276,6 @@ void u_fz_md5_image(fz_context *ctx, fz_image *image, unsigned char digest[16]) 
 }
 
 
-
-
 void u_pdf_sign_signature(fz_context *ctx, pdf_document *doc, pdf_widget *widget, const char *sigfile, const char *password, vg_pathlist *pathlist, const char *overlay_msg) {
     pdf_signer *signer = pdf_read_pfx(ctx, sigfile, password);
     pdf_designated_name *dn = NULL;
@@ -289,7 +287,6 @@ void u_pdf_sign_signature(fz_context *ctx, pdf_document *doc, pdf_widget *widget
     fz_try(ctx)
     {
 
-        char *dn_str;
         pdf_obj *wobj = ((pdf_annot *)widget)->obj;
         fz_rect rect = fz_empty_rect;
 
@@ -297,39 +294,37 @@ void u_pdf_sign_signature(fz_context *ctx, pdf_document *doc, pdf_widget *widget
 
         pdf_to_rect(ctx, pdf_dict_get(ctx, wobj, PDF_NAME_Rect), &rect);
         /* Create an appearance stream only if the signature is intended to be visible */
-        if (!fz_is_empty_rect(&rect))
-        {
-//            dn = pdf_signer_designated_name(ctx, signer);
-//            fzbuf = fz_new_buffer(ctx, 256);
-//            if (!dn->cn)
-//                fz_throw(ctx, FZ_ERROR_GENERIC, "Certificate has no common name");
+        if (!fz_is_empty_rect(&rect)) {
+            if(overlay_msg == NULL) {
+                dn = pdf_signer_designated_name(ctx, signer);
+                fzbuf = fz_new_buffer(ctx, 256);
+                if (!dn->cn)
+                    fz_throw(ctx, FZ_ERROR_GENERIC, "Certificate has no common name");
 
-//            fz_buffer_printf(ctx, fzbuf, "cn=%s", dn->cn);
+                fz_buffer_printf(ctx, fzbuf, "cn=%s", dn->cn);
 
-//            if (dn->o)
-//                fz_buffer_printf(ctx, fzbuf, ", o=%s", dn->o);
+                if (dn->o)
+                    fz_buffer_printf(ctx, fzbuf, ", o=%s", dn->o);
 
-//            if (dn->ou)
-//                fz_buffer_printf(ctx, fzbuf, ", ou=%s", dn->ou);
+                if (dn->ou)
+                    fz_buffer_printf(ctx, fzbuf, ", ou=%s", dn->ou);
 
-//            if (dn->email)
-//                fz_buffer_printf(ctx, fzbuf, ", email=%s", dn->email);
+                if (dn->email)
+                    fz_buffer_printf(ctx, fzbuf, ", email=%s", dn->email);
 
-//            if (dn->c)
-//                fz_buffer_printf(ctx, fzbuf, ", c=%s", dn->c);
+                if (dn->c)
+                    fz_buffer_printf(ctx, fzbuf, ", c=%s", dn->c);
 
-//            dn_str = (char *) fz_string_from_buffer(ctx, fzbuf);
+                overlay_msg = (char *) fz_string_from_buffer(ctx, fzbuf);
+            }
+
             u_pdf_set_signature_appearance(ctx, doc, (pdf_annot *)widget, pathlist, overlay_msg);
         }
-    }
-    fz_always(ctx)
-    {
+    } fz_always(ctx) {
         pdf_drop_signer(ctx, signer);
-        pdf_drop_designated_name(ctx, dn);
-        fz_drop_buffer(ctx, fzbuf);
-    }
-    fz_catch(ctx)
-    {
+        if(dn != NULL) pdf_drop_designated_name(ctx, dn);
+        if(fzbuf != NULL) fz_drop_buffer(ctx, fzbuf);
+    } fz_catch(ctx) {
         fz_rethrow(ctx);
     }
 }
@@ -639,82 +634,79 @@ static void center_rect_within_rect(const fz_rect *tofit, const fz_rect *within,
     fz_pre_translate(mat, -tofit_center.x, -tofit_center.y);
 }
 
-//static float logo_color[3] = {(float)0x25/(float)0xFF, (float)0x72/(float)0xFF, (float)0xAC/(float)0xFF};
-static float logo_bg_color[4] = {(float)0x25/(float)0xFF, (float)0xAC/(float)0xFF, (float)0x72/(float)0xFF, 0.9};
-static float logo_fg_color[4] = {1, 1, 1, 1};
 static float logo_color[4] = {(float)0x25/(float)0xFF, (float)0x72/(float)0xFF, (float)0xAC/(float)0xFF, 1};
 
 static vg_pathlist *get_default_sig_pathlist() {
     vg_pathlist *plist = vg_new_pathlist();
     vg_path *path = vg_add_path(plist, vg_new_path(VG_FILL, logo_color));
-
-    vg_add_cmd(path, vg_moveto(122.25f, 0.0f));
-    vg_add_cmd(path, vg_lineto(122.25f, -14.249f));
-    vg_add_cmd(path, vg_curveto(125.98f, -13.842f, 129.73f, -13.518f, 133.5f, -13.277f));
-    vg_add_cmd(path, vg_lineto(133.5f, 0.0f));
-    vg_add_cmd(path, vg_lineto(122.25f, 0.0f));
+    vg_add_cmd(path, vg_moveto(1, 122.25f, 0.0f));
+    vg_add_cmd(path, vg_lineto(1, 122.25f, -14.249f));
+    vg_add_cmd(path, vg_curveto(1, 125.98f, -13.842f, 129.73f, -13.518f, 133.5f, -13.277f));
+    vg_add_cmd(path, vg_lineto(1, 133.5f, 0.0f));
+    vg_add_cmd(path, vg_lineto(1, 122.25f, 0.0f));
     vg_add_cmd(path, vg_close());
-    vg_add_cmd(path, vg_moveto(140.251f, 0.0f));
-    vg_add_cmd(path, vg_lineto(140.251f, -12.935f));
-    vg_add_cmd(path, vg_curveto(152.534f, -12.477f, 165.03f, -12.899f, 177.75f, -14.249f));
+    vg_add_cmd(path, vg_moveto(1, 140.251f, 0.0f));
+    vg_add_cmd(path, vg_lineto(1, 140.251f, -12.935f));
+    vg_add_cmd(path, vg_curveto(1, 152.534f, -12.477f, 165.03f, -12.899f, 177.75f, -14.249f));
 
-    vg_add_cmd(path, vg_lineto(177.75f, -21.749f));
-    vg_add_cmd(path, vg_curveto(165.304f, -20.413f, 152.809f, -19.871f, 140.251f, -20.348f));
-    vg_add_cmd(path, vg_lineto(140.251f, -39.0f));
-    vg_add_cmd(path, vg_lineto(133.5f, -39.0f));
-    vg_add_cmd(path, vg_lineto(133.5f, -20.704f));
-    vg_add_cmd(path, vg_curveto(129.756f, -20.956f, 126.006f, -21.302f, 122.25f, -21.749f));
-    vg_add_cmd(path, vg_lineto(122.25f, -50.999f));
-    vg_add_cmd(path, vg_lineto(177.751f, -50.999f));
-    vg_add_cmd(path, vg_lineto(177.751f, 0.0f));
-    vg_add_cmd(path, vg_lineto(140.251f, 0.0f));
-    vg_add_cmd(path, vg_close());
-
-    vg_add_cmd(path, vg_moveto(23.482f, -129.419f));
-    vg_add_cmd(path, vg_curveto(-20.999f, -199.258f, -0.418f, -292.039f, 69.42f, -336.519f));
-    vg_add_cmd(path, vg_curveto(139.259f, -381.0f, 232.04f, -360.419f, 276.52f, -290.581f));
-    vg_add_cmd(path, vg_curveto(321.001f, -220.742f, 300.42f, -127.961f, 230.582f, -83.481f));
-    vg_add_cmd(path, vg_curveto(160.743f, -39.0f, 67.962f, -59.581f, 23.482f, -129.419f));
+    vg_add_cmd(path, vg_lineto(1, 177.75f, -21.749f));
+    vg_add_cmd(path, vg_curveto(1, 165.304f, -20.413f, 152.809f, -19.871f, 140.251f, -20.348f));
+    vg_add_cmd(path, vg_lineto(1, 140.251f, -39.0f));
+    vg_add_cmd(path, vg_lineto(1, 133.5f, -39.0f));
+    vg_add_cmd(path, vg_lineto(1, 133.5f, -20.704f));
+    vg_add_cmd(path, vg_curveto(1, 129.756f, -20.956f, 126.006f, -21.302f, 122.25f, -21.749f));
+    vg_add_cmd(path, vg_lineto(1, 122.25f, -50.999f));
+    vg_add_cmd(path, vg_lineto(1, 177.751f, -50.999f));
+    vg_add_cmd(path, vg_lineto(1, 177.751f, 0.0f));
+    vg_add_cmd(path, vg_lineto(1, 140.251f, 0.0f));
     vg_add_cmd(path, vg_close());
 
-    vg_add_cmd(path, vg_moveto(254.751f, -128.492f));
-    vg_add_cmd(path, vg_curveto(303.074f, -182.82f, 295.364f, -263.762f, 237.541f, -309.165f));
-    vg_add_cmd(path, vg_curveto(179.718f, -354.568f, 93.57f, -347.324f, 45.247f, -292.996f));
-    vg_add_cmd(path, vg_curveto(-3.076f, -238.668f, 4.634f, -157.726f, 62.457f, -112.323f));
-    vg_add_cmd(path, vg_curveto(120.28f, -66.92f, 206.428f, -74.164f, 254.751f, -128.492f));
+    vg_add_cmd(path, vg_moveto(1, 23.482f, -129.419f));
+    vg_add_cmd(path, vg_curveto(1, -20.999f, -199.258f, -0.418f, -292.039f, 69.42f, -336.519f));
+    vg_add_cmd(path, vg_curveto(1, 139.259f, -381.0f, 232.04f, -360.419f, 276.52f, -290.581f));
+    vg_add_cmd(path, vg_curveto(1, 321.001f, -220.742f, 300.42f, -127.961f, 230.582f, -83.481f));
+    vg_add_cmd(path, vg_curveto(1, 160.743f, -39.0f, 67.962f, -59.581f, 23.482f, -129.419f));
     vg_add_cmd(path, vg_close());
 
-    vg_add_cmd(path, vg_moveto(111.0f, -98.999f));
-    vg_add_cmd(path, vg_curveto(87.424f, -106.253f, 68.25f, -122.249f, 51.75f, -144.749f));
-    vg_add_cmd(path, vg_lineto(103.5f, -297.749f));
-    vg_add_cmd(path, vg_lineto(213.75f, -298.499f));
-
-    vg_add_cmd(path, vg_curveto(206.25f, -306.749f, 195.744f, -311.478f, 185.25f, -314.249f));
-    vg_add_cmd(path, vg_curveto(164.22f, -319.802f, 141.22f, -319.775f, 120.0f, -314.999f));
-    vg_add_cmd(path, vg_curveto(96.658f, -309.745f, 77.25f, -298.499f, 55.5f, -283.499f));
-    vg_add_cmd(path, vg_curveto(69.75f, -299.249f, 84.617f, -311.546f, 102.75f, -319.499f));
-    vg_add_cmd(path, vg_curveto(117.166f, -325.822f, 133.509f, -327.689f, 149.25f, -327.749f));
-    vg_add_cmd(path, vg_curveto(164.21f, -327.806f, 179.924f, -326.532f, 193.5f, -320.249f));
-    vg_add_cmd(path, vg_curveto(213.95f, -310.785f, 232.5f, -294.749f, 245.25f, -276.749f));
-
-    vg_add_cmd(path, vg_lineto(227.25f, -276.749f));
-    vg_add_cmd(path, vg_curveto(213.963f, -276.749f, 197.25f, -263.786f, 197.25f, -250.499f));
-
-    vg_add_cmd(path, vg_lineto(197.25f, -112.499f));
-    vg_add_cmd(path, vg_curveto(213.75f, -114.749f, 228.0f, -127.499f, 241.5f, -140.999f));
-    vg_add_cmd(path, vg_curveto(231.75f, -121.499f, 215.175f, -109.723f, 197.25f, -101.249f));
-    vg_add_cmd(path, vg_curveto(181.5f, -95.249f, 168.412f, -94.775f, 153.0f, -94.499f));
-    vg_add_cmd(path, vg_curveto(139.42f, -94.256f, 120.75f, -95.999f, 111.0f, -98.999f));
+    vg_add_cmd(path, vg_moveto(1, 254.751f, -128.492f));
+    vg_add_cmd(path, vg_curveto(1, 303.074f, -182.82f, 295.364f, -263.762f, 237.541f, -309.165f));
+    vg_add_cmd(path, vg_curveto(1, 179.718f, -354.568f, 93.57f, -347.324f, 45.247f, -292.996f));
+    vg_add_cmd(path, vg_curveto(1, -3.076f, -238.668f, 4.634f, -157.726f, 62.457f, -112.323f));
+    vg_add_cmd(path, vg_curveto(1, 120.28f, -66.92f, 206.428f, -74.164f, 254.751f, -128.492f));
     vg_add_cmd(path, vg_close());
 
-    vg_add_cmd(path, vg_moveto(125.25f, -105.749f));
-    vg_add_cmd(path, vg_lineto(125.25f, -202.499f));
-    vg_add_cmd(path, vg_lineto(95.25f, -117.749f));
-    vg_add_cmd(path, vg_curveto(105.75f, -108.749f, 114.0f, -105.749f, 125.25f, -105.749f));
+    vg_add_cmd(path, vg_moveto(1, 111.0f, -98.999f));
+    vg_add_cmd(path, vg_curveto(1, 87.424f, -106.253f, 68.25f, -122.249f, 51.75f, -144.749f));
+    vg_add_cmd(path, vg_lineto(1, 103.5f, -297.749f));
+    vg_add_cmd(path, vg_lineto(1, 213.75f, -298.499f));
+
+    vg_add_cmd(path, vg_curveto(1, 206.25f, -306.749f, 195.744f, -311.478f, 185.25f, -314.249f));
+    vg_add_cmd(path, vg_curveto(1, 164.22f, -319.802f, 141.22f, -319.775f, 120.0f, -314.999f));
+    vg_add_cmd(path, vg_curveto(1, 96.658f, -309.745f, 77.25f, -298.499f, 55.5f, -283.499f));
+    vg_add_cmd(path, vg_curveto(1, 69.75f, -299.249f, 84.617f, -311.546f, 102.75f, -319.499f));
+    vg_add_cmd(path, vg_curveto(1, 117.166f, -325.822f, 133.509f, -327.689f, 149.25f, -327.749f));
+    vg_add_cmd(path, vg_curveto(1, 164.21f, -327.806f, 179.924f, -326.532f, 193.5f, -320.249f));
+    vg_add_cmd(path, vg_curveto(1, 213.95f, -310.785f, 232.5f, -294.749f, 245.25f, -276.749f));
+
+    vg_add_cmd(path, vg_lineto(1, 227.25f, -276.749f));
+    vg_add_cmd(path, vg_curveto(1, 213.963f, -276.749f, 197.25f, -263.786f, 197.25f, -250.499f));
+
+    vg_add_cmd(path, vg_lineto(1, 197.25f, -112.499f));
+    vg_add_cmd(path, vg_curveto(1, 213.75f, -114.749f, 228.0f, -127.499f, 241.5f, -140.999f));
+    vg_add_cmd(path, vg_curveto(1, 231.75f, -121.499f, 215.175f, -109.723f, 197.25f, -101.249f));
+    vg_add_cmd(path, vg_curveto(1, 181.5f, -95.249f, 168.412f, -94.775f, 153.0f, -94.499f));
+    vg_add_cmd(path, vg_curveto(1, 139.42f, -94.256f, 120.75f, -95.999f, 111.0f, -98.999f));
+    vg_add_cmd(path, vg_close());
+
+    vg_add_cmd(path, vg_moveto(1, 125.25f, -105.749f));
+    vg_add_cmd(path, vg_lineto(1, 125.25f, -202.499f));
+    vg_add_cmd(path, vg_lineto(1, 95.25f, -117.749f));
+    vg_add_cmd(path, vg_curveto(1, 105.75f, -108.749f, 114.0f, -105.749f, 125.25f, -105.749f));
     vg_add_cmd(path, vg_close());
 
     return plist;
 }
+
 
 static void font_info_fin(fz_context *ctx, font_info *font_rec)
 {
@@ -808,7 +800,6 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
     fz_colorspace *cs = NULL;
     fz_buffer *fzbuf = NULL;
     fz_matrix page_ctm;
-    vg_fz_pathlist *fzpaths = NULL;
 
     if(pathlist == NULL) {
         pathlist = get_default_sig_pathlist();
@@ -830,7 +821,6 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
     fz_var(cs);
     fz_var(fzbuf);
     fz_var(page_ctm);
-    fz_var(fzpaths);
     fz_var(pathlist);
     fz_try(ctx)
     {
@@ -844,7 +834,7 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
         dlist = fz_new_display_list(ctx, NULL);
         dev = fz_new_list_device(ctx, dlist);
 
-        fzpaths = vg_draw_pathlist(ctx, dev, &rect, &page_ctm, pathlist);
+        vg_draw_pathlist(ctx, dev, &rect, &page_ctm, pathlist);
 
         rect = annot_rect;
         get_font_info(ctx, doc, dr, da, &font_rec);
@@ -897,7 +887,6 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
         fz_drop_text(ctx, text);
         fz_drop_colorspace(ctx, cs);
         fz_drop_buffer(ctx, fzbuf);
-        vg_drop_fz_paths(fzpaths);
         vg_free_pathlist(pathlist);
     }
     fz_catch(ctx)

@@ -12,7 +12,7 @@ double map_input_number(json_t *jsn_obj, const char *property, float default_val
 
 fill_type map_input_signature(pdf_env *env) {
     const char *sigfile = NULL;
-    json_t *json_sigfile = NULL, *json_font = NULL, *json_pwd, *json_pos;
+    json_t *json_sigfile = NULL, *json_font = NULL, *json_text = NULL, *json_pwd, *json_pos;
     struct stat buffer;
     pos_data *pos = &env->fill.sig.pos;
 
@@ -62,6 +62,13 @@ fill_type map_input_signature(pdf_env *env) {
     } else {
         RETURN_FILL_ERROR("Password not given");
     }
+
+
+    json_text = json_object_get(env->fill.json_map_item, "text");
+    env->fill.sig.text = json_is_string(json_text) ? json_string_value(json_text) : NULL;
+
+    json_text = json_object_get(env->fill.json_map_item, "gfx");
+    env->fill.sig.gfx = json_is_string(json_text) ? json_string_value(json_text) : NULL;
 
     return ADD_SIGNATURE;
 }
