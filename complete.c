@@ -42,7 +42,6 @@ void cmplt_fill_all(pdf_env *env) {
         goto tpl_exit;
     }
 
-
     fz_var(json_err);
     fz_var(data_file);
     fz_var(data_json);
@@ -159,6 +158,10 @@ int cmplt_fill_field(pdf_env *env) {
             updated = cmplt_add_textfield(env);
             break;
 
+        case ADD_TEXT:
+            updated = cmplt_add_text(env);
+            break;
+
         case ADD_SIGNATURE:
             // delay signing until all fields complete in cmplt_fill_all, then save, reload, sign, resave
             env->add_sig = 1;
@@ -198,8 +201,75 @@ void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field
 
 
 
+
+int cmplt_add_text(pdf_env *env) {
+    int i, buflen;
+    pdf_obj *contents;
+
+    unsigned char *content_str;
+    pdf_obj *resources = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Resources);
+    fz_buffer *buf  = NULL, *buf_compr = NULL;
+    float curr_top, line_height = env->fill.text.fontsize * 1.2;
+    const char *templ1 = " BT %g %g %g rg 1 0 0 1 %g %g Tm /%s %g Tf";
+    const char *templ2 = "Tj 0 -%g TD\n";
+    fz_rect pg_rect = {0, 0, 0, 0};
+    pdf_bound_page(env->ctx, env->page, &pg_rect);
+    char *text_tok, *text_dup = strdup(env->fill.input_data);
+    float max_top = pg_rect.y1 - pg_rect.y0 - line_height;
+
+    fz_try(env->ctx) {
+        u_pdf_add_font_res(env, resources, env->fill.text.font, env->fill.text.fontfile);
+
+        contents = pdf_dict_get(env->ctx, env->page->obj, PDF_NAME_Contents);
+
+        if (pdf_is_array(env->ctx, contents)) {   // take last if more than one contents object
+            i = pdf_array_len(env->ctx, contents) - 1;
+            contents = pdf_array_get(env->ctx, contents, i);
+        }
+
+        buf = pdf_load_stream(env->ctx, contents);
+
+        if (!buf)
+            fz_throw(env->ctx, FZ_ERROR_GENERIC, "PDF: not a stream object");
+
+        text_data *txt = &env->fill.text;
+        curr_top = pg_rect.y1 - pg_rect.y0 - txt->pos.top - txt->fontsize;
+        fz_buffer_printf(env->ctx, buf, templ1, txt->color[0], txt->color[1], txt->color[2], txt->pos.left, curr_top, txt->font, txt->fontsize);
+        fz_buffer_print_pdf_string(env->ctx, buf, strtok(text_dup, "\n"));
+        fz_write_buffer(env->ctx, buf, "Tj\n", strlen("Tj\n"));
+        fz_buffer_printf(env->ctx, buf, templ2, line_height);
+
+        int c = 0;
+        while((text_tok = strtok(NULL, "\n")) != NULL) {
+            curr_top += line_height;
+            if(curr_top > max_top) break;
+            if(c > 0) fz_buffer_printf(env->ctx, buf, "T* ", strlen("T* "));
+            fz_buffer_print_pdf_string(env->ctx, buf, text_tok);
+            fz_write_buffer(env->ctx, buf, "Tj\n", strlen("Tj\n"));
+            c++;
+        }
+
+        fz_write_buffer(env->ctx, buf, "ET\n", strlen("ET\n"));
+        fz_write_buffer_byte(env->ctx, buf, 0);
+
+        pdf_dict_put(env->ctx, contents, PDF_NAME_Filter, PDF_NAME_FlateDecode);
+        buflen = fz_buffer_storage(env->ctx, buf, &content_str);
+        buf_compr = u_pdf_deflatebuf(env->ctx, content_str, (size_t) buflen);
+        pdf_update_stream(env->ctx, env->doc, contents, buf_compr, 1);
+
+    } fz_always(env->ctx) {
+        if (buf) fz_drop_buffer(env->ctx, buf);
+        if (buf_compr) fz_drop_buffer(env->ctx, buf);
+        free(text_dup);
+    } fz_catch(env->ctx) {
+        return 0;
+    }
+    return 1;
+}
+
+
 int cmplt_add_image(pdf_env *env) {
-    // adapted from https://github.com/rk700/PyMuPDF/blob/master/fitz/fitz_wrap.c fz_page_s_insertImage
+    // mostly https://github.com/rk700/PyMuPDF/blob/master/fitz/fitz_wrap.c
     char X[15], Y[15], W[15], H[15], size_str[15], xref_str[15], name[50];
     const char *template = " q %s 0 0 %s %s %s cm /%s Do Q \n";
     const char *name_templ = "Image%s-%s-%s-%s";
@@ -210,7 +280,7 @@ int cmplt_add_image(pdf_env *env) {
     size_t c_len;
     unsigned char *content_str;
     image_data *imgdata = &env->fill.img;
-    struct fz_rect_s pgrect, rect = {imgdata->pos.left, imgdata->pos.top, imgdata->pos.right, imgdata->pos.bottom};
+    struct fz_rect_s pgrect, rect = {imgdata->pos.left, imgdata->pos.top, imgdata->pos.width, imgdata->pos.height};
     pdf_bound_page(env->ctx, env->page, &pgrect);
 
     fz_matrix page_ctm;
@@ -227,13 +297,14 @@ int cmplt_add_image(pdf_env *env) {
         img = fz_new_image_from_file(env->ctx, imgdata->file_name);
         ref = u_pdf_add_image(env->ctx, env->doc, img, 0);
 
+        // scale image width to requested height or keep image width
         if(rect.x1 == 0) {
-            // use orig img width if requesed width & height == 0, if width == 0 and height !=0 scale width to same proportion as height
-            rect.x1 = (rect.y1 == 0) ? img->w : img->w * rect.y1 / img->h;
+            rect.x1 = (imgdata->pos.height == 0) ? img->w : img->w * rect.y1 / img->h;
         }
 
+        // scale image height to requested width or keep image height
         if(rect.y1 == 0) {
-            rect.y1 = (imgdata->pos.right == 0) ? img->h : img->h * rect.x1 / img->w;
+            rect.y1 = (imgdata->pos.width == 0) ? img->h : img->h * rect.x1 / img->w;
         }
 
         fz_transform_point((fz_point *)(&rect), &page_ctm);
@@ -301,19 +372,15 @@ fz_buffer *cmplt_deflatebuf(fz_context *ctx, unsigned char *p, size_t n) {
 }
 
 
-int cmplt_da_str(const char *font, float *color, char *buf) {
-    int size = 0;
-    char tmp_fn[30];
-    sscanf(font, "%s %d", tmp_fn, &size);
-
+int cmplt_da_str(const char *font, float size, float *color, char *buf) {
     if(size <= 0) {
         size = DEFAULT_FONT_HEIGHT;
     }
 
     if(color == NULL) {
-        return sprintf(buf, "/%s %d Tf 0 g", tmp_fn, size);
+        return sprintf(buf, "/%s %.2f Tf 0 g", font, size);
     } else {
-        return sprintf(buf, "/%s %d Tf %.2f %.2f %.2f gb", tmp_fn, size, color[0], color[1], color[2]);
+        return sprintf(buf, "/%s %.2f Tf %.2f %.2f %.2f gb", font, size, color[0], color[1], color[2]);
     }
 }
 
@@ -328,10 +395,10 @@ int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, sign
     fz_try(ctx) {
         vg_pathlist *pathlist = NULL;
         char fn_str[50];
-        if(sig->visible != 0 && cmplt_da_str(sig->font, NULL, fn_str) > 0) {
-            fz_rect *rect = (fz_rect *) &sig->pos;
+        if(sig->visible != 0 && cmplt_da_str(sig->font, sig->fontsize, NULL, fn_str) > 0) {
+            fz_rect rect = {sig->pos.left, sig->pos.top, sig->pos.left + sig->pos.width, sig->pos.top + sig->pos.height};
 
-            pdf_set_annot_rect(ctx, annot, rect);
+            pdf_set_annot_rect(ctx, annot, &rect);
             pdf_obj *da_pdf = pdf_new_string(ctx, doc, fn_str, strlen(fn_str));
             pdf_dict_put_drop(ctx, annot->obj, PDF_NAME_DA, da_pdf);
             pdf_field_set_display(ctx, doc, annot->obj, 0);
@@ -349,6 +416,8 @@ int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, sign
 }
 
 
+
+
 int cmplt_add_textfield(pdf_env *env) {
     pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_TEXT, (char*)env->fill.input_key);
 
@@ -361,7 +430,7 @@ int cmplt_add_textfield(pdf_env *env) {
     pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
 
     char fn_str[50];
-    if(env->fill.text.font && cmplt_da_str(env->fill.text.font, env->fill.text.color, fn_str) > 0) {
+    if(env->fill.text.font && cmplt_da_str(env->fill.text.font, env->fill.text.fontsize, env->fill.text.color, fn_str) > 0) {
         pdf_obj *da_pdf= pdf_new_string(env->ctx, env->doc, fn_str, strlen(fn_str));
         pdf_dict_put_drop(env->ctx, annot->obj, PDF_NAME_DA, da_pdf);
     }

@@ -1,10 +1,35 @@
 #include "fill.h"
 #include "mupdf/pdf.h"
 #include "mupdf/memento.h"
+#include <zlib.h>
 
-// this file is basically pdf-appearance.c with a few tweaks to customise appearance
-// mupdf does not expose much of this behaviour (complex internal api how could they tbh)
-// copying huge chunks of their code seems to be the only option to change the signature appearance to how I want
+
+void u_pdf_add_font_res(pdf_env *env, pdf_obj *resources, const char *name, const char *path) {
+    const char *data;
+    int size;
+    fz_font *font;
+    pdf_obj *subres, *font_ref;
+
+    data = fz_lookup_base14_font(env->ctx, path, &size);
+    if (data) {
+        font = fz_new_font_from_memory(env->ctx, path, data, size, 0, 0);
+    } else {
+        font = fz_new_font_from_file(env->ctx, NULL, path, 0, 0);
+    }
+
+    subres = pdf_dict_get(env->ctx, resources, PDF_NAME_Font);
+    if (!subres) {
+        subres = pdf_add_object_drop(env->ctx, env->doc, pdf_new_dict(env->ctx, env->doc, 1));
+    }
+
+    font_ref = pdf_add_simple_font(env->ctx, env->doc, font);
+    fz_drop_font(env->ctx, font);
+
+    pdf_dict_puts(env->ctx, subres, name, font_ref);
+    pdf_dict_put(env->ctx, resources, PDF_NAME_Font, subres);
+    pdf_drop_obj(env->ctx, font_ref);
+}
+
 
 pdf_obj *u_pdf_add_image(fz_context *ctx, pdf_document *doc, fz_image *image, int mask) {
     fz_pixmap *pixmap = NULL;
@@ -893,4 +918,22 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
     {
         fz_rethrow(ctx);
     }
+}
+
+fz_buffer *u_pdf_deflatebuf(fz_context *ctx, unsigned char *p, int n) {
+    fz_buffer *buf;
+    unsigned char *data;
+    int t;
+    uLongf csize = compressBound(n);
+
+
+    data = fz_malloc(ctx, csize);
+    buf = fz_new_buffer_from_data(ctx, data, csize);
+    t = compress(data, &csize, p, n);
+    if (t != Z_OK) {
+        fz_drop_buffer(ctx, buf);
+        fz_throw(ctx, FZ_ERROR_GENERIC, "cannot deflate buffer");
+    }
+    fz_resize_buffer(ctx, buf, csize);
+    return buf;
 }

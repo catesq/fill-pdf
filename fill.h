@@ -5,15 +5,10 @@
 #include <mupdf/pdf.h>
 #include <jansson.h>
 
-typedef enum {FILL_DATA_INVALID, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_SIGNATURE, ADD_IMAGE} fill_type;
-
-typedef enum {ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} command;
-
 #define CMD_COUNT 5
 
 const char *command_names[CMD_COUNT];
 extern fz_document_handler pdf_document_handler;
-
 
 #define DEFAULT_SIG_WIDTH 30
 #define DEFAULT_SIG_HEIGHT 30
@@ -28,18 +23,24 @@ extern fz_document_handler pdf_document_handler;
 
 #define UTF8_FIELD_NAME(ctx, obj) pdf_to_utf8(ctx, pdf_dict_get(ctx, obj, PDF_NAME_T));
 
+typedef enum {FILL_DATA_INVALID = 0, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_TEXT, ADD_SIGNATURE, ADD_IMAGE} fill_type;
+
 #define RETURN_FILL_ERROR(err) { \
     fprintf(stderr, err); \
+    fprintf(stderr, "\n"); \
     return FILL_DATA_INVALID; \
 }
 
 #define RETURN_FILL_ERROR_ARG(err, arg) { \
     fprintf(stderr, err, arg); \
+    fprintf(stderr, "\n"); \
     return FILL_DATA_INVALID; \
 }
 
 #define INIT_CAP 8
 
+
+typedef enum {ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} command;
 
 // vg = vector graphics. a simple wrapper of mupdf's internal vg drawing api
 
@@ -119,8 +120,8 @@ typedef struct _vg_fz_pathlist {
 typedef struct {
     float left;
     float top;
-    float right;
-    float bottom;
+    float width;
+    float height;
 } pos_data;
 
 
@@ -128,6 +129,7 @@ typedef struct {
     pos_data pos;
     const char *widget_name;
     const char *font;
+    float fontsize;
     const char *file;
     const char *password;
     const char *text;
@@ -147,7 +149,9 @@ typedef struct {
     pos_data pos;
     int editable;
     const char *font;
-    float color[3];
+    const char *fontfile;
+    float fontsize;
+    float color[4];
 } text_data;
 
 
@@ -241,7 +245,7 @@ int main(int argc, char **argv);
 //complete.c
 int cmplt_fill_field(pdf_env *env);
 void cmplt_fill_all(pdf_env *env);
-int cmplt_da_str(const char *font, float *color, char *buf);
+int cmplt_da_str(const char *font, float size, float *color, char *buf);
 void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field);
 int cmplt_fcopy(const char *src, const char *dest);
 static int cmplt_sign_and_save(pdf_env *env);
@@ -249,6 +253,7 @@ static int cmplt_sign_and_save(pdf_env *env);
 int cmplt_add_image(pdf_env *env);
 int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, signature_data *sig);
 int cmplt_add_textfield(pdf_env *env);
+int cmplt_add_text(pdf_env *env);
 int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data);
 pdf_widget *cmplt_find_widget_name(fz_context *ctx, pdf_page *page, const char *field_name);
 pdf_widget *cmplt_find_widget_id(fz_context *ctx, pdf_page *page, int field_id);
@@ -257,12 +262,14 @@ fz_buffer *cmplt_deflatebuf(fz_context *ctx, unsigned char *p, size_t n);
 
 
 //map_input.c
-double map_input_number(json_t *jsn_obj, const char *property, float default_val, float min_val);
-void map_input_posdata(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height);
+//double map_input_number(json_t *jsn_obj, const char *property, float default_val, float min_val);
+//void map_input_posdata(json_t *jsn_obj, pos_data *pos, float default_xy, float default_width, float default_height);
 fill_type map_input_signature(pdf_env *env);
-fill_type map_input_textfield(pdf_env *env, fill_type success_type);
+fill_type map_input_textfield(pdf_env *env);
+fill_type map_input_text(pdf_env *env);
 fill_type map_input_data(pdf_env *env);
 fill_type map_input_image(pdf_env *env);
+fill_type map_input_text(pdf_env *env);
 
 //parse.c
 visit_funcs get_visitor_funcs(int cmd);
@@ -293,6 +300,9 @@ void u_pdf_preload_image_resources(fz_context *ctx, pdf_document *doc);
 void u_fz_md5_image(fz_context *ctx, fz_image *image, unsigned char digest[16]);
 void u_pdf_sign_signature(fz_context *ctx, pdf_document *doc, pdf_widget *widget, const char *sigfile, const char *password, vg_pathlist *pathlist, const char *overlay_msg);
 void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_annot *annot, vg_pathlist *pathlist, const char *msg_1);
+void u_pdf_add_font_res(pdf_env *env, pdf_obj *resources, const char *name, const char *path);
+fz_buffer *u_pdf_deflatebuf(fz_context *ctx, unsigned char *p, int n);
+
 
 //vg_path.c
 
