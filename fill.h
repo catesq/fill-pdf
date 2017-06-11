@@ -39,14 +39,14 @@ typedef enum {FILL_DATA_INVALID = 0, FIELD_ID, FIELD_NAME, ADD_TEXTFIELD, ADD_TE
 
 #define INIT_CAP 8
 
-
-typedef enum {ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} command;
+typedef enum { ANNOTATE_FIELDS, JSON_LIST, JSON_MAP, FONT_LIST, COMPLETE_PDF} command;
 
 // vg = vector graphics. a simple wrapper of mupdf's internal vg drawing api
 
 typedef enum { VG_STROKE, VG_FILL } vg_path_type;
 typedef enum { VG_MOVE, VG_LINE, VG_HORIZ, VG_VERT, VG_CURVE, VG_CLOSE } vg_cmd_type;
 typedef enum { VG_PARSE_ERROR, VG_PARSE_CMD, VG_PARSE_PATH } vg_parse_result;
+
 
 typedef struct _vg_coord {
     float val;
@@ -166,6 +166,7 @@ typedef struct {
     files_env files;
     char *dataFile;
     char *tplFile;
+
     char *certFile;
     char *certPwd;
 
@@ -182,6 +183,7 @@ typedef struct {
         signature_data sig;
         image_data img;
     };
+
 } _fill_env;
 
 
@@ -246,6 +248,7 @@ int main(int argc, char **argv);
 int cmplt_fill_field(pdf_env *env);
 void cmplt_fill_all(pdf_env *env);
 int cmplt_da_str(const char *font, float size, float *color, char *buf);
+int cmplt_set_page_readonly(fz_context *ctx, pdf_document *doc, pdf_page *page);
 void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field);
 int cmplt_fcopy(const char *src, const char *dest);
 static int cmplt_sign_and_save(pdf_env *env);

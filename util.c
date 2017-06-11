@@ -3,6 +3,7 @@
 #include "mupdf/memento.h"
 #include <zlib.h>
 
+// much of this file is based on mupdf source code
 
 void u_pdf_add_font_res(pdf_env *env, pdf_obj *resources, const char *name, const char *path) {
     const char *data;
@@ -44,17 +45,7 @@ pdf_obj *u_pdf_add_image(fz_context *ctx, pdf_document *doc, fz_image *image, in
     /* If we can maintain compression, do so */
     cbuffer = fz_compressed_image_buffer(ctx, image);
 
-    fz_var(pixmap);
-    fz_var(imobj);
-    fz_var(imref);
-    fz_var(cbuffer);
-    fz_var(cp);
-    fz_var(buffer);
-    fz_var(colorspace);
-    fz_var(digest);
-    fz_var(alpha);
-    fz_try(ctx)
-    {
+    fz_try(ctx) {
         /* Before we add this image as a resource check if the same image
          * already exists in our resources for this doc.  If yes, then
          * hand back that reference */
@@ -239,13 +230,6 @@ void u_pdf_preload_image_resources(fz_context *ctx, pdf_document *doc) {
     fz_image *image = NULL;
     unsigned char digest[16];
 
-    fz_var(len);
-    fz_var(k);
-    fz_var(obj);
-    fz_var(type);
-    fz_var(res);
-    fz_var(image);
-    fz_var(digest);
     fz_try(ctx)
     {
         len = pdf_count_objects(ctx, doc);
@@ -755,8 +739,7 @@ static void get_font_info(fz_context *ctx, pdf_document *doc, pdf_obj *dr, char 
 }
 
 
-static void u_insert_signature_appearance_layers(fz_context *ctx, pdf_document *doc, pdf_annot *annot)
-{
+static void u_insert_signature_appearance_layers(fz_context *ctx, pdf_document *doc, pdf_annot *annot) {
     pdf_obj *ap = pdf_dict_getl(ctx, annot->obj, PDF_NAME_AP, PDF_NAME_N, NULL);
     pdf_obj *main_ap = NULL;
     pdf_obj *frm = NULL;
@@ -766,13 +749,7 @@ static void u_insert_signature_appearance_layers(fz_context *ctx, pdf_document *
 
     pdf_to_rect(ctx, pdf_dict_get(ctx, ap, PDF_NAME_BBox), &bbox);
 
-    fz_var(ap);
-    fz_var(main_ap);
-    fz_var(frm);
-    fz_var(bbox);
-
-    fz_var(n0);
-    fz_var(fzbuf);
+    fz_var(annot);
     fz_try(ctx)
     {
         main_ap = pdf_new_xobject(ctx, doc, &bbox, &fz_identity);
@@ -837,15 +814,6 @@ void u_pdf_set_signature_appearance(fz_context *ctx, pdf_document *doc, pdf_anno
 
     memset(&font_rec, 0, sizeof(font_rec));
 
-    fz_var(obj);
-    fz_var(dr);
-    fz_var(dlist);
-    fz_var(dev);
-    fz_var(font_rec);
-    fz_var(text);
-    fz_var(cs);
-    fz_var(fzbuf);
-    fz_var(page_ctm);
     fz_var(pathlist);
     fz_try(ctx)
     {

@@ -14,7 +14,7 @@ void usage_message(int cmd) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "  fillpdf <command> [options] input.pdf [output]\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "Available <command>s:\n");
+    fprintf(stderr, "Available commands:\n");
     fprintf(stderr, "  annot info template fonts complete\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Examples:\n");
@@ -182,7 +182,6 @@ int main(int argc, char **argv) {
     if(retval == EXIT_FAILURE) goto main_exit_ctxt;
 
     /* Open the document. */
-    fz_var(retval);
     fz_try(env->ctx) {
         env->doc = pdf_open_document(env->ctx, env->files.input);
     } fz_catch(env->ctx)	{
@@ -193,7 +192,6 @@ int main(int argc, char **argv) {
     if(retval == EXIT_FAILURE) goto main_exit_ctxt;
 
     /* Count the number of pages. */
-    fz_var(retval);
     fz_try(env->ctx) {
         env->page_count = pdf_count_pages(env->ctx, env->doc);
     } fz_catch(env->ctx)	{

@@ -8,6 +8,7 @@
 #include "fill.h"
 #include "zlib.h"
 
+
 void cmplt_fill_all(pdf_env *env) {
     json_error_t json_err;
 
@@ -42,10 +43,6 @@ void cmplt_fill_all(pdf_env *env) {
         goto tpl_exit;
     }
 
-    fz_var(json_err);
-    fz_var(data_file);
-    fz_var(data_json);
-    fz_var(template);
     fz_try(env->ctx) {
         const char* obj_idx;
         int page_idx, item_idx;
@@ -68,8 +65,11 @@ void cmplt_fill_all(pdf_env *env) {
                 updated_pg += cmplt_fill_field(env);
             }
 
-            if(updated_pg)
+            updated_pg += cmplt_set_page_readonly(env->ctx, env->doc, env->page);
+
+            if(updated_pg) {
                 pdf_update_page(env->ctx, env->page);
+            }
 
             pdf_drop_page(env->ctx, env->page);
 
@@ -179,6 +179,7 @@ int cmplt_fill_field(pdf_env *env) {
     return updated;
 }
 
+
 int cmplt_fcopy(const char *src, const char *dest) {
     FILE *in = fopen(src, "r");
     FILE *out = fopen(dest, "w");
@@ -198,8 +199,6 @@ void cmplt_set_field_readonly(fz_context *ctx, pdf_document *doc, pdf_obj *field
     pdf_obj *ffobj = pdf_new_int(ctx, doc, ffval | Ff_ReadOnly);
     pdf_dict_put_drop(ctx, field, PDF_NAME_Ff, ffobj);
 }
-
-
 
 
 int cmplt_add_text(pdf_env *env) {
@@ -230,7 +229,7 @@ int cmplt_add_text(pdf_env *env) {
         buf = pdf_load_stream(env->ctx, contents);
 
         if (!buf)
-            fz_throw(env->ctx, FZ_ERROR_GENERIC, "PDF: not a stream object");
+            fz_throw(env->ctx, FZ_ERROR_GENERIC, "PDF: not a stream");
 
         text_data *txt = &env->fill.text;
         curr_top = pg_rect.y1 - pg_rect.y0 - txt->pos.top - txt->fontsize;
@@ -346,6 +345,7 @@ int cmplt_add_image(pdf_env *env) {
     return 1;
 }
 
+
 fz_buffer *cmplt_deflatebuf(fz_context *ctx, unsigned char *p, size_t n) {
     fz_buffer *buf;
     unsigned long csize;
@@ -416,16 +416,15 @@ int cmplt_add_signature(fz_context *ctx, pdf_document *doc, pdf_page *page, sign
 }
 
 
-
-
 int cmplt_add_textfield(pdf_env *env) {
     pdf_widget *widget = pdf_create_widget(env->ctx, env->doc, env->page, PDF_WIDGET_TYPE_TEXT, (char*)env->fill.input_key);
 
-    fz_rect *rect = (fz_rect *) &env->fill.text.pos;
+    pos_data *pos = &env->fill.text.pos;
+    fz_rect rect = {pos->left, pos->top, pos->left + pos->width, pos->top + pos->height};
 
     pdf_annot *annot = (pdf_annot*) widget;
 
-    pdf_set_annot_rect(env->ctx, annot, rect);
+    pdf_set_annot_rect(env->ctx, annot, &rect);
     pdf_field_set_value(env->ctx, env->doc, annot->obj, env->fill.input_data);
     pdf_field_set_display(env->ctx, env->doc, annot->obj, 0);
 
@@ -481,7 +480,13 @@ pdf_widget *cmplt_find_widget_name(fz_context *ctx, pdf_page *page, const char *
 
 
 int cmplt_set_widget_value(pdf_env *env, pdf_widget *widget, const char *data) {
-    return widget == NULL ? 0 : pdf_field_set_value(env->ctx, env->doc, ((pdf_annot*) widget)->obj, data);
+    if (widget == NULL) {
+        return 0;
+    }
+
+    pdf_obj *obj = ((pdf_annot*) widget)->obj;
+    pdf_field_set_value(env->ctx, env->doc, obj, data);
+    return 1;
 }
 
 
@@ -491,6 +496,31 @@ int str_is_all_digits(const char *str) {
             return 0;
 
     return 1;
+}
+
+
+int cmplt_set_page_readonly(fz_context *ctx, pdf_document *doc, pdf_page *page) {
+    int type, retval = 0;
+    pdf_widget *widget;
+
+    fz_try(ctx) {
+        widget = pdf_first_widget(ctx, doc, page);
+
+        while(widget) {
+            type = pdf_widget_type(ctx, widget);
+
+            if(type != PDF_WIDGET_TYPE_SIGNATURE && type != PDF_WIDGET_TYPE_NOT_WIDGET) {
+                cmplt_set_field_readonly(ctx, doc, ((pdf_annot *) widget)->obj);
+                retval = 1;
+            }
+
+            widget = pdf_next_widget(ctx, widget);
+        }
+    } fz_catch(ctx) {
+
+    }
+
+    return retval;
 }
 
 
@@ -536,8 +566,6 @@ static int cmplt_sign_and_save(pdf_env *env) {
 
     if(!retval) goto sig_exit_doc;
 
-    fz_var(sig_doc);
-    fz_var(sig_page);
     fz_try(sig_ctx) {
         cmplt_add_signature(sig_ctx, sig_doc, sig_page, &env->add_sig_data);
         pdf_update_page(env->ctx, sig_page);
