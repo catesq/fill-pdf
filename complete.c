@@ -380,7 +380,7 @@ int cmplt_da_str(const char *font, float size, float *color, char *buf) {
     if(color == NULL) {
         return sprintf(buf, "/%s %.2f Tf 0 g", font, size);
     } else {
-        return sprintf(buf, "/%s %.2f Tf %.2f %.2f %.2f gb", font, size, color[0], color[1], color[2]);
+        return sprintf(buf, "/%s %.2f Tf %.2f %.2f %.2f rg", font, size, color[0], color[1], color[2]);
     }
 }
 
